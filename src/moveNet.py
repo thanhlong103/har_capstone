@@ -16,59 +16,49 @@ model.compile(loss='binary_crossentropy',
               optimizer='adam',
               metrics=['accuracy'])
 
-def make_landmark_timestep(keypoints_with_scores):
+def make_landmark_timestep(keypoints_with_scores, bbox):
     c_lm = []  # Start with an empty list
-    for i in range(6):
-        keypoints = keypoints_with_scores[0][i][:51]
+    if bbox[4] > 0.3:
+        keypoints_k = keypoints_with_scores.reshape(-1, 3)  
 
-        bbox = keypoints_with_scores[0][i][51:57]
+        for i in range(0, 17):
+            c_lm.append(keypoints_k[i])  # Append each keypoint as a list
 
-        if bbox[4] > 0.3:
-            keypoints_k = keypoints.reshape(-1, 3)  
-
-            for j in range(0, 17):
-                c_lm.append(keypoints_k[j])  # Append each keypoint as a list
-
-            c_lm = np.concatenate(c_lm)
+        c_lm = np.concatenate(c_lm)
     return c_lm
 
-def draw(frame, keypoints_with_scores, edges, confidence_threshold):
+def draw(frame, keypoints, edges, confidence_threshold, bbox):
     y, x, _ = frame.shape
+    if bbox[4] > 0.3:
+        startpoint = (int(bbox[1]*x), int(bbox[0]*y))
+        endpoint = (int(bbox[3]*x), int(bbox[2]*y))
+        thickness = 2
+        # Blue color in BGR
+        color = (255, 0, 0)
+        cv2.rectangle(frame, startpoint, endpoint, color, thickness)
 
-    for i in range(6):
-        keypoints = keypoints_with_scores[0][i][:51]
-        bbox = keypoints_with_scores[0][i][51:57]
+    if keypoints.shape[0] == 51:
+        keypoints_k = keypoints.reshape(-1, 3)
 
-        if bbox[4] > 0.3:
-            startpoint = (int(bbox[1]*x), int(bbox[0]*y))
-            endpoint = (int(bbox[3]*x), int(bbox[2]*y))
-            thickness = 2
-            # Blue color in BGR
-            color = (255, 0, 0)
-            cv2.rectangle(frame, startpoint, endpoint, color, thickness)
+    for kp in keypoints_k:
+        ky, kx, kp_conf = kp
 
-        if keypoints.shape[0] == 51:
-            keypoints_k = keypoints.reshape(-1, 3)
+        # Draw the keypoint if confidence is above the threshold
+        if kp_conf >= confidence_threshold:
+            cv2.circle(frame, (int(kx*x), int(ky*y)), 7, (0, 255, 0), -1)
 
-        for kp in keypoints_k:
-            ky, kx, kp_conf = kp
+    for edge, _ in edges.items():
+        p1, p2 = edge
+        kp1 = keypoints_k[p1]
+        kp2 = keypoints_k[p2]
 
-            # Draw the keypoint if confidence is above the threshold
-            if kp_conf >= confidence_threshold:
-                cv2.circle(frame, (int(kx*x), int(ky*y)), 7, (0, 255, 0), -1)
+        # Unpack the coordinates and confidence for both keypoints
+        y1, x1, c1 = kp1
+        y2, x2, c2 = kp2
 
-        for edge, _ in edges.items():
-            p1, p2 = edge
-            kp1 = keypoints_k[p1]
-            kp2 = keypoints_k[p2]
-
-            # Unpack the coordinates and confidence for both keypoints
-            y1, x1, c1 = kp1
-            y2, x2, c2 = kp2
-
-            # Draw the connection if both points have a confidence above the threshold
-            if c1 > confidence_threshold and c2 > confidence_threshold:
-                cv2.line(frame, (int(x1 * x), int(y1 * y)), (int(x2 * x), int(y2 * y)), (255, 0, 0), 2)
+        # Draw the connection if both points have a confidence above the threshold
+        if c1 > confidence_threshold and c2 > confidence_threshold:
+            cv2.line(frame, (int(x1 * x), int(y1 * y)), (int(x2 * x), int(y2 * y)), (255, 0, 0), 2)
 
 def estimator(frame, interpreter, prevtime):
     EDGES = {
@@ -105,12 +95,7 @@ def estimator(frame, interpreter, prevtime):
     # print("Runtime: ", runtime)
     prevtime = currenttime
 
-    # Rendering 
-    draw(frame, keypoints_with_scores, EDGES, 0.3)
-
-    frame = cv2.flip(frame, 1)
-
-    return frame, keypoints_with_scores, prevtime
+    return EDGES, keypoints_with_scores, prevtime
 
 def keep_aspect_ratio_resizer(image, target_size):
     _, height, width, _ = image.shape
@@ -141,15 +126,16 @@ def detect(interpreter, input_tensor):
     keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
     return keypoints_with_scores
 
-def draw_class_on_image(label, img):
+def draw_class_on_image(label, img, bbox):
+    y, x, _ = img.shape
     font = cv2.FONT_HERSHEY_SIMPLEX
-    bottomLeftCornerOfText = (10, 30)
+    position = (int(bbox[1]*x), int(bbox[0]*y-10))
     fontScale = 1
     fontColor = (0, 255, 0)
     thickness = 2
     lineType = 2
     cv2.putText(img, label,
-                bottomLeftCornerOfText,
+                position,
                 font,
                 fontScale,
                 fontColor,
@@ -213,22 +199,29 @@ sumfps = 0
 while True:
     success, img = cap.read()
     if success:
-        img, keypoints_with_scores, prevtime = estimator(img, interpreter, prevtime)
+        EDGES, keypoints_with_scores, prevtime = estimator(img, interpreter, prevtime)
 
         i = i + 1
         if i > warmup_frames:
-            print("Start detect....")
+            print('---------')
+            for j in range(6):
+                bbox = keypoints_with_scores[0][j][51:57]
+                keypoints = keypoints_with_scores[0][j][:51]
+                
+                # Rendering 
+                draw(img, keypoints, EDGES, 0.3, bbox)
 
-            if keypoints_with_scores.any():
-                c_lm = make_landmark_timestep(keypoints_with_scores)
-                lm_list.append(c_lm)
-                if len(lm_list) == n_time_steps:
-                    # predict
-                    thread_01 = threading.Thread(target=detectAct, args=(model, lm_list,))
-                    thread_01.start()
-                    lm_list = []
-
-        img = draw_class_on_image(label, img)
+                if bbox[4] > 0.3:
+                    c_lm = make_landmark_timestep(keypoints, bbox)
+                    if len(c_lm) > 0:
+                        lm_list.append(c_lm)
+                    if len(lm_list) == n_time_steps:
+                        # predict
+                        # thread_01 = threading.Thread(target=detectAct, args=(model, lm_list,))
+                        # thread_01.start()
+                        detectAct(model, lm_list)
+                        lm_list = []
+                    img = draw_class_on_image(label, img, bbox)
 
         # font which we will be using to display FPS 
         font = cv2.FONT_HERSHEY_SIMPLEX 
@@ -237,11 +230,10 @@ while True:
 
         fps = 1/(new_frame_time-prev_frame_time) 
         prev_frame_time = new_frame_time 
-        fps_int = int(fps) 
-        fps_str = "FPS: " + str(fps)
+        fps_str = "FPS: " + str(round(fps,2))
 
         # Update fpsArr and sumfps
-        fpsArr.append(fps_int)
+        fpsArr.append(fps)
         sumfps = sum(fpsArr)
         fpsAvg = sumfps / len(fpsArr)
 
@@ -250,7 +242,7 @@ while True:
             fpsArr = []
             sumfps = 0
         
-        cv2.putText(img, fps_str, (500, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
+        cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
 
         cv2.imshow("Image", img)
     if cv2.waitKey(1) == ord('q'):
