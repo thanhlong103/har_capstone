@@ -4,12 +4,28 @@ import tensorflow as tf
 from keras.models import load_model
 import math
 import time
-import threading
 
 label = "Warmup...."
 n_time_steps = 10
-lm_list = []
+lm_list = [[],[],[],[],[],[]]
 prevAct = time.time()
+i = 0
+warmup_frames = 60
+
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+# Initialize prevtime for runtime calculation
+prevtime = time.time()
+
+# used to record the time when we processed last frame 
+prev_frame_time = 0
+  
+# used to record the time at which we processed current frame 
+new_frame_time = 0
+
+fpsArr = []
+sumfps = 0
+
 
 model = load_model('model\savedModel\HARmodel\model.h5')
 model.compile(loss='binary_crossentropy',
@@ -172,13 +188,23 @@ def detectAct(model, lm_list):
     
     return label, prevAct
 
-i = 0
-warmup_frames = 60
+def detectEachPerson(keypoints_with_scores, img):
+    for i in range(6):
+        bbox = keypoints_with_scores[0][i][51:57]
+        keypoints = keypoints_with_scores[0][i][:51]
+    
+        # Rendering 
+        draw(img, keypoints, EDGES, 0.3, bbox)
 
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-
-# Initialize prevtime for runtime calculation
-prevtime = time.time()
+        if bbox[4] > 0.3:
+            c_lm = make_landmark_timestep(keypoints, bbox)
+            if len(c_lm) > 0:
+                lm_list[i].append(c_lm)
+            if len(lm_list[i]) == n_time_steps:
+                detectAct(model, lm_list[i])
+                lm_list[i] = []
+            img = draw_class_on_image(label, img, bbox)
+    return img
 
 # Load the model interpreter
 try:
@@ -186,15 +212,6 @@ try:
     interpreter.allocate_tensors()
 except:
     print("Can not access the model!")
-
-# used to record the time when we processed last frame 
-prev_frame_time = 0
-  
-# used to record the time at which we processed current frame 
-new_frame_time = 0
-
-fpsArr = []
-sumfps = 0
 
 while True:
     success, img = cap.read()
@@ -204,24 +221,7 @@ while True:
         i = i + 1
         if i > warmup_frames:
             print('---------')
-            for j in range(6):
-                bbox = keypoints_with_scores[0][j][51:57]
-                keypoints = keypoints_with_scores[0][j][:51]
-                
-                # Rendering 
-                draw(img, keypoints, EDGES, 0.3, bbox)
-
-                if bbox[4] > 0.3:
-                    c_lm = make_landmark_timestep(keypoints, bbox)
-                    if len(c_lm) > 0:
-                        lm_list.append(c_lm)
-                    if len(lm_list) == n_time_steps:
-                        # predict
-                        # thread_01 = threading.Thread(target=detectAct, args=(model, lm_list,))
-                        # thread_01.start()
-                        detectAct(model, lm_list)
-                        lm_list = []
-                    img = draw_class_on_image(label, img, bbox)
+            detectEachPerson(keypoints_with_scores, img)
 
         # font which we will be using to display FPS 
         font = cv2.FONT_HERSHEY_SIMPLEX 
