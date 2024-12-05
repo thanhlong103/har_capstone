@@ -6,9 +6,6 @@ import math
 import time
 
 label = "Warmup...."
-n_time_steps = 10
-lm_list = [[],[],[],[],[],[]]
-prevAct = time.time()
 i = 0
 warmup_frames = 60
 
@@ -25,22 +22,6 @@ new_frame_time = 0
 
 fpsArr = []
 sumfps = 0
-
-model = load_model('model\savedModel\HARmodel\model.h5')
-model.compile(loss='binary_crossentropy',
-              optimizer='adam',
-              metrics=['accuracy'])
-
-def make_landmark_timestep(keypoints_with_scores, bbox):
-    c_lm = []  # Start with an empty list
-    if bbox[4] > 0.3:
-        keypoints_k = keypoints_with_scores.reshape(-1, 3)  
-
-        for i in range(0, 17):
-            c_lm.append(keypoints_k[i])  # Append each keypoint as a list
-
-        c_lm = np.concatenate(c_lm)
-    return c_lm
 
 def draw(frame, keypoints, edges, confidence_threshold, bbox):
     y, x, _ = frame.shape
@@ -141,52 +122,6 @@ def detect(interpreter, input_tensor):
     keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
     return keypoints_with_scores
 
-def draw_class_on_image(label, img, bbox):
-    y, x, _ = img.shape
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    position = (int(bbox[1]*x), int(bbox[0]*y-10))
-    fontScale = 1
-    fontColor = (0, 255, 0)
-    thickness = 2
-    lineType = 2
-    cv2.putText(img, label,
-                position,
-                font,
-                fontScale,
-                fontColor,
-                thickness,
-                lineType)
-    return img
-
-def detectAct(model, lm_list):
-    global label, prevAct
-    lm_list = np.array(lm_list)
-    lm_list = np.expand_dims(lm_list, axis=0)
-    
-    currentTime = time.time()  # Corrected time call
-    results = np.argmax(model.predict(lm_list, verbose=0))
-    
-    runtime = currentTime - prevAct
-    print("Runtime: ", runtime)
-    
-    # Update prevAct for next call
-    prevAct = currentTime
-    
-    if results == 0:
-        label = "HANDCLAPPING"
-    elif results == 1:
-        label = "BOXING"
-    elif results == 2:
-        label = "HANDWAVING"
-    elif results == 3:
-        label = "JOGGING"
-    elif results == 4:
-        label = "RUNNING"
-    else:
-        label = "WALKING"
-    
-    return label, prevAct
-
 def detectEachPerson(keypoints_with_scores, img):
     for i in range(6):
         bbox = keypoints_with_scores[0][i][51:57]
@@ -194,15 +129,6 @@ def detectEachPerson(keypoints_with_scores, img):
     
         # Rendering 
         draw(img, keypoints, EDGES, 0.3, bbox)
-
-        if bbox[4] > 0.3:
-            c_lm = make_landmark_timestep(keypoints, bbox)
-            if len(c_lm) > 0:
-                lm_list[i].append(c_lm)
-            if len(lm_list[i]) == n_time_steps:
-                detectAct(model, lm_list[i])
-                lm_list[i] = []
-            img = draw_class_on_image(label, img, bbox)
     return img
 
 # Load the model interpreter
