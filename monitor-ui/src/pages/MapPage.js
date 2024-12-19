@@ -50,8 +50,8 @@ function MapPage() {
       d3.select('#scan-visualization').selectAll('*').remove();
 
       // Set up dimensions
-      const width = 700;
-      const height = 700;
+      const width = 800;
+      const height = 580;
       const svg = d3
         .select('#scan-visualization')
         .append('svg')
@@ -79,7 +79,7 @@ function MapPage() {
         .append('circle')
         .attr('cx', (d) => d.x)
         .attr('cy', (d) => d.y)
-        .attr('r', 2)
+        .attr('r', 1)
         .attr('fill', 'blue');
     }
   }, [scanData]);
@@ -93,7 +93,7 @@ function MapPage() {
       height="100vh"
     >
       <Typography variant="h2">LiDAR Scan</Typography>
-      <Box id="scan-visualization" style={{ marginTop: '20px' }}></Box>
+      <Box id="scan-visualization" style={{}} justifyContent="center"></Box>
     </Box>
   );
 }
