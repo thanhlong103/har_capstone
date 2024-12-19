@@ -18,8 +18,9 @@ RUN apt-get update && apt-get install -y \
     libudev-dev \
     && rm -rf /var/lib/apt/lists/*
     
-RUN export ROS_DOMAIN_ID=9
-RUN export TURTLE3_MODEL=waffle
+ENV ROS_DOMAIN_ID=9
+
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc 
 
 # Run custom scripts or commands during build
 RUN echo "Custom setup complete."
