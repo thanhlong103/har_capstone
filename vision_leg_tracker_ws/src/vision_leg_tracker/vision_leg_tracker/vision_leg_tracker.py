@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-from cv_bridge import CvBridge, CvBridgeError
-# from realsense_depth import *
+# from cv_bridge import CvBridge, CvBridgeError
+from realsense_depth import *
 import tensorflow as tf
 import rclpy
 from rclpy.node import Node
@@ -28,19 +28,19 @@ intrinsics = None
 class VisionTrackerNode(Node):
     def __init__(self):
         super().__init__('vision_tracker')
-        self.bridge = CvBridge()
+        # self.bridge = CvBridge()
         
         # Subscribers
-        self.depth_sub = message_filters.Subscriber(self, Image, "/camera/aligned_depth_to_color/image_raw")
-        self.color_sub = message_filters.Subscriber(self, Image, "/camera/color/image_raw")
-        self.color_info_sub = message_filters.Subscriber(self, CameraInfo, "/camera/aligned_depth_to_color/camera_info")
+        # self.depth_sub = message_filters.Subscriber(self, Image, "/camera/aligned_depth_to_color/image_raw")
+        # self.color_sub = message_filters.Subscriber(self, Image, "/camera/color/image_raw")
+        # self.color_info_sub = message_filters.Subscriber(self, CameraInfo, "/camera/aligned_depth_to_color/camera_info")
         # self.scan_sub = message_filters.Subscriber(self, LaserScan, "/scan") # add later in the self.ats
         
         # Publishers
         self.image_pub = self.create_publisher(Image, "/marked_image", 10)
         self.people_pub = self.create_publisher(PersonArray, "/people_detected_vision", 10)
         
-        self.interpreter = tf.lite.Interpreter(model_path='/home/vision_leg_tracker_ws/src/vision_leg_tracker/vision_leg_tracker/model.tflite')
+        self.interpreter = tf.lite.Interpreter(model_path='/home/har_capstone/vision_leg_tracker_ws/src/vision_leg_tracker/vision_leg_tracker/model.tflite')
         self.interpreter.allocate_tensors()
         print("Model sucessfully loaded!")
 
