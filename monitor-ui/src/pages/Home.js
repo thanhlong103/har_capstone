@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Grid } from '@mui/material';
+import { Button, Grid, Typography } from '@mui/material';
 
 function Home() {
   const navigate = useNavigate();
@@ -11,15 +11,29 @@ function Home() {
       height: '100vh', 
       margin: 'auto', 
       display: 'flex', 
+      flexDirection: 'column', // Stack title and content vertically
       justifyContent: 'center', 
       alignItems: 'center', 
       position: 'relative', 
       backgroundColor: '#00196E'  // Set background color
     }}>
+      {/* Title */}
+      <Typography 
+        variant="h2" 
+        style={{ 
+          color: '#FFAD1D',
+          fontWeight: 'bold',
+          marginTop: '10px', 
+          marginBottom: '0px', // Add space between title and buttons
+          textAlign: 'center',
+        }}
+      >
+        SOCIALLY AWARE SERVICE ROBOT
+      </Typography>
+
       <div style={{ 
-        width: '90vw', 
+        width: '95vw', 
         height: '90vh', 
-        margin: 'auto', 
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center', 
@@ -34,7 +48,8 @@ function Home() {
                 backgroundColor: '#FFAD1D', 
                 width: '100%', 
                 height: '100%', 
-                fontSize: '1.5rem',
+                fontSize: '3rem',
+                borderRadius: '20px',
                 color: '#333' // Title color
               }}
               onClick={() => navigate('/map')}
@@ -51,7 +66,8 @@ function Home() {
                 backgroundColor: '#FFAD1D', 
                 width: '100%', 
                 height: '100%', 
-                fontSize: '1.5rem',
+                fontSize: '3rem',
+                borderRadius: '20px',
                 color: '#333' // Title color
               }}
               onClick={() => navigate('/move-to-destination')}
@@ -68,7 +84,8 @@ function Home() {
                 backgroundColor: '#FFAD1D', 
                 width: '100%', 
                 height: '100%', 
-                fontSize: '1.5rem',
+                fontSize: '3rem',
+                borderRadius: '20px',
                 color: '#333' // Title color
               }}
               onClick={() => navigate('/makerspace-guide')}
@@ -86,7 +103,8 @@ function Home() {
                 color: '#FFAD1D', 
                 width: '100%', 
                 height: '100%', 
-                fontSize: '1.5rem'
+                fontSize: '3rem',
+                borderRadius: '20px'
               }}
               onClick={() => navigate('/back-to-home')}
             >
