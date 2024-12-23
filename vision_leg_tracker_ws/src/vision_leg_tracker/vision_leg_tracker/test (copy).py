@@ -4,10 +4,10 @@ import cv2
 import tensorflow as tf
 
 pipe = rs.pipeline()
-cfg  = rs.config()
+cfg = rs.config()
 
-cfg.enable_stream(rs.stream.color, 640,480, rs.format.bgr8, 30)
-cfg.enable_stream(rs.stream.depth, 640,480, rs.format.z16, 30)
+cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 
 # Get device product line for setting a supporting resolution
 pipeline_wrapper = rs.pipeline_wrapper(pipe)
@@ -17,6 +17,7 @@ device_product_line = str(device.get_info(rs.camera_info.product_line))
 
 cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+
 
 def main(args=None):
     pipe.start(cfg)
@@ -29,7 +30,7 @@ def main(args=None):
         depth_image = np.asanyarray(depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
         depth_cm = cv2.applyColorMap(cv2.convertScaleAbs(depth_image,
-                                        alpha = 0.5), cv2.COLORMAP_JET)
+                                                         alpha=0.5), cv2.COLORMAP_JET)
 
         gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
 
@@ -40,6 +41,7 @@ def main(args=None):
             break
 
     pipe.stop()
+
 
 if __name__ == '__main__':
     main()

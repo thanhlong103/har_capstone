@@ -1,5 +1,5 @@
-## License: Apache 2.0. See LICENSE file in root directory.
-## Copyright(c) 2017 Intel Corporation. All Rights Reserved.
+# License: Apache 2.0. See LICENSE file in root directory.
+# Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
 #####################################################
 ##                  Export to PLY                  ##
@@ -11,7 +11,8 @@ import pyrealsense2 as rs
 
 # Declare pointcloud object, for calculating pointclouds and texture mappings
 pc = rs.pointcloud()
-# We want the points object to be persistent so we can display the last cloud when a frame drops
+# We want the points object to be persistent so we can display the last
+# cloud when a frame drops
 points = rs.points()
 
 # Declare RealSense pipeline, encapsulating the actual device and sensors
@@ -36,12 +37,14 @@ try:
     ply = rs.save_to_ply("1.ply")
 
     # Set options to the desired values
-    # In this example we'll generate a textual PLY with normals (mesh is already created by default)
+    # In this example we'll generate a textual PLY with normals (mesh is
+    # already created by default)
     ply.set_option(rs.save_to_ply.option_ply_binary, False)
     ply.set_option(rs.save_to_ply.option_ply_normals, True)
 
     print("Saving to 1.ply...")
-    # Apply the processing block to the frameset which contains the depth frame and the texture
+    # Apply the processing block to the frameset which contains the depth
+    # frame and the texture
     ply.process(colorized)
     print("Done")
 finally:
