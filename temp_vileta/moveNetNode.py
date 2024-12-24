@@ -10,7 +10,7 @@ import time
 import os 
 import pandas as pd
 from matplotlib import pyplot as plt
-from tflite_runtime.interpreter import load_delegate
+# from tflite_runtime.interpreter import load_delegate
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -53,7 +53,7 @@ class VisionLegTracker(Node):
             (13, 15): 'm',(12, 14): 'c',(14, 16): 'c'
         }
 
-        self.input_size = 256
+        self.input_size = 224
 
         self.offset_x = 150.0
         self.offset_y = 37
