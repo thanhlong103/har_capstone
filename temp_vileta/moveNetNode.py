@@ -10,6 +10,7 @@ import time
 import os 
 import pandas as pd
 from matplotlib import pyplot as plt
+from tflite_runtime.interpreter import load_delegate
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -17,6 +18,7 @@ class VisionLegTracker(Node):
         self.pipe = rs.pipeline()
         self.cfg  = rs.config()
 
+        self.cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
         self.cfg.enable_stream(rs.stream.color, 640,480, rs.format.bgr8, 30) 
 
         self.label = "Warmup...."
@@ -53,7 +55,23 @@ class VisionLegTracker(Node):
 
         self.input_size = 256
 
+        self.offset_x = 150.0
+        self.offset_y = 37
+        self.offset_z = 0.0
+        self.offset = [self.offset_x, self.offset_y, self.offset_z]
+        self.real_width = 220.0  # (mm) of the box
+        self.threshold = 300  # (mm)
+        self.intrinsics = None
+
         try:
+        # self.interpreter = tf.lite.Interpreter(
+        #     model_path="1.tflite",
+        #     experimental_delegates=[
+        #         load_delegate("libnvdsinfer_custom_impl.so")
+        #     ]
+        # )
+        # self.interpreter.allocate_tensors()
+
             self.interpreter = tf.lite.Interpreter(model_path='1.tflite')
             self.interpreter.allocate_tensors()
             self.get_logger().info('MoveNet loaded!')
@@ -111,7 +129,6 @@ class VisionLegTracker(Node):
 
         return keypoints_with_scores, prevtime
 
-
     def keep_aspect_ratio_resizer(self, image, target_size):
         _, height, width, _ = image.shape
         scale = float(target_size / width)
@@ -150,40 +167,86 @@ class VisionLegTracker(Node):
             # Rendering 
             self.draw(img, keypoints, bbox)
         return img
+    
+    def localization(self, frame, offset, intrinsics, bbox, depth_array):
+        y, x, _ = frame.shape
+        if bbox[4] > self.confidence_threshold:
+            startpoint = (int(bbox[1]*x), int(bbox[0]*y))
+            endpoint = (int(bbox[3]*x), int(bbox[2]*y))
+            x_pixel = int((startpoint[0]+endpoint[0])/2)
+            y_pixel = int((startpoint[1]+endpoint[1])/2)
+            depth = depth_array[y_pixel, x_pixel]  # row index, column index
+            coordinate_camera = rs.rs2_deproject_pixel_to_point(
+                intrinsics, [x_pixel, y_pixel], depth)
+            
+            print(x_pixel, y_pixel, depth, coordinate_camera)
+            # print(coordinate_camera)
+
+            # Remapping from camera to world
+            x_world = coordinate_camera[0]
+            y_world = (coordinate_camera[1])
+            z_world = coordinate_camera[2] 
+            person_coor = [x_world, y_world, z_world]
+            return person_coor
+        return []
 
     def processImage(self):
         frame = self.pipe.wait_for_frames()
         color_frame = frame.get_color_frame()
+        depth_frame = frame.get_depth_frame()
         img = np.asanyarray(color_frame.get_data())
+        depth_image = np.asanyarray(depth_frame.get_data())
 
-        if True:
-            keypoints_with_scores, self.prevtime = self.estimator(img, self.interpreter, self.prevtime)
+        # Initialize camera intrinsics if not done
+        if self.intrinsics is None:
+            self.intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
 
-            self.detectEachPerson(keypoints_with_scores, img)
+        keypoints_with_scores, self.prevtime = self.estimator(img, self.interpreter, self.prevtime)
 
-            # font which we will be using to display FPS 
-            font = cv2.FONT_HERSHEY_SIMPLEX 
+        # Detect and process keypoints for each person
+        self.detectEachPerson(keypoints_with_scores, img)
 
-            # time when we finish processing for this frame 
-            self.new_frame_time = time.time() 
+        # Localization to get the world coordinates
+        person_world_coords = []
+        for i in range(6):
+            bbox = keypoints_with_scores[0][i][51:57]
+            if bbox[4] > self.confidence_threshold:  # Only proceed if confidence is above threshold
+                y, x, _ = img.shape
+                # Get the 3D world coordinates of the person
+                world_coords = self.localization(img, self.offset, self.intrinsics, bbox, depth_image)
+                startpoint = (int(bbox[1]*x), int(bbox[0]*y))
+                endpoint = (int(bbox[3]*x), int(bbox[2]*y))
+                x_pixel = int((startpoint[0]+endpoint[0])/2)
+                y_pixel = int((startpoint[1]+endpoint[1])/2)
+                cv2.circle(img, (x_pixel,y_pixel), 5, (0, 0, 255), -1)  # Red circle
+                if world_coords:
+                    person_world_coords.append(world_coords)
 
-            fps = 1/(self.new_frame_time-self.prev_frame_time) 
-            self.prev_frame_time = self.new_frame_time 
-            fps_str = "FPS: " + str(round(fps,2))
+        # Log the world coordinates for debugging
+        if person_world_coords:
+            for i, coords in enumerate(person_world_coords):
+                print(f"Person {i+1} World Coordinates: {coords}")
 
-            # Update fpsArr and sumfps
-            self.fpsArr.append(fps)
-            sumfps = sum(self.fpsArr)
-            fpsAvg = sumfps / len(self.fpsArr)
+        # Display FPS
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        self.new_frame_time = time.time()
+        fps = 1 / (self.new_frame_time - self.prev_frame_time)
+        self.prev_frame_time = self.new_frame_time
+        fps_str = "FPS: " + str(round(fps, 2))
 
-            if len(self.fpsArr) == 10:  # Reset every 10 frames
-                print(f"Avg FPS: {fpsAvg}")
-                fpsArr = []
-                sumfps = 0
+        # Update fpsArr and sumfps
+        self.fpsArr.append(fps)
+        sumfps = sum(self.fpsArr)
+        fpsAvg = sumfps / len(self.fpsArr)
 
-            cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
+        if len(self.fpsArr) == 10:  # Reset every 10 frames
+            print(f"Avg FPS: {fpsAvg}")
+            self.fpsArr = []
+            sumfps = 0
 
-            cv2.imshow("Image", img)
+        cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
+        cv2.imshow("Image", img)
+        cv2.imshow('depth', depth_image)
 
         if cv2.waitKey(1) == ord('q'):
             self.pipe.stop()
