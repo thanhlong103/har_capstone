@@ -21,7 +21,7 @@ class PersonFusion(Node):
     def __init__(self):
         super().__init__('kalman_filter')
         self.create_subscription(PersonArray, 'people_detected_vision', self.vision_callback, 10) # change this
-        self.create_subscription(PersonArray, 'people_tracked', self.laser_callback, 10)
+        self.create_subscription(PersonArray, 'people_tracked', self.laser_callback, 10) # lidar_ws ngoài vision_leg_tracker
         self.people_fused_pub = self.create_publisher(FusedPersonArray, 'people_fused', 10)
         
         self.dist_travelled = 0.
@@ -97,7 +97,7 @@ class PersonFusion(Node):
         self.vel_x = self.filtered_state_means[2]
         self.vel_y = self.filtered_state_means[3]
 
-    def is_nearest(self, x_vision, y_vision, x_laser, y_laser, threshold):
+    def is_nearest(self, x_vision, y_vision, x_laser, y_laser, threshold): #so sánh distance pos hiện tại vs prev_pos or any pos
         """Check if detected persons from two data streams are aligned"""
         dis = ((x_vision - x_laser)**2 + (y_vision - y_laser)**2)**0.5
         return dis <= threshold
