@@ -77,7 +77,7 @@ RUN apt-get install -y python-numpy
 
 RUN echo "source /opt/ros/foxy/setup.bash" >> ~/.bashrc
 RUN echo "source /home/ros2_ws/install/setup.bash" >> ~/.bashrc
-RUN echo "export ROS_DOMAIN_ID=1" >> ~/.bashrc
+RUN echo "export ROS_DOMAIN_ID=9" >> ~/.bashrc
 RUN source ~/.bashrc
 
 WORKDIR /home/ros2_ws

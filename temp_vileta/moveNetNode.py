@@ -59,7 +59,7 @@ class VisionLegTracker(Node):
             (13, 15): "m", (12, 14): "c", (14, 16): "c",
         }
 
-        self.input_size = 190
+        self.input_size = 128
 
         self.offset_x = 150.0
         self.offset_y = 37.0
@@ -89,6 +89,12 @@ class VisionLegTracker(Node):
         # Define the camera frame's static transform
         self.broadcast_camera_frame()
 
+        # Frame width and height
+        frame = self.pipe.wait_for_frames()
+        color_frame = frame.get_color_frame()
+        img = np.asanyarray(color_frame.get_data())
+        self.HEIGHT, self.WIDTH, _ = img.shape
+
     def broadcast_camera_frame(self):
         # Create a TransformStamped message
         t = TransformStamped()
@@ -112,10 +118,9 @@ class VisionLegTracker(Node):
         self.get_logger().info("Camera frame transform broadcasted.")
 
     def draw(self, frame, keypoints, bbox):
-        y, x, _ = frame.shape
         if bbox[4] > self.confidence_threshold:
-            startpoint = (int(bbox[1] * x), int(bbox[0] * y))
-            endpoint = (int(bbox[3] * x), int(bbox[2] * y))
+            startpoint = (int(bbox[1] * self.WIDTH), int(bbox[0] * self.HEIGHT))
+            endpoint = (int(bbox[3] * self.WIDTH), int(bbox[2] * self.HEIGHT))
             thickness = 2
 
             # Blue color in BGR
@@ -130,7 +135,7 @@ class VisionLegTracker(Node):
 
             # Draw the keypoint if confidence is above the threshold
             if kp_conf >= self.confidence_threshold:
-                cv2.circle(frame, (int(kx * x), int(ky * y)), 7, (0, 255, 0), -1)
+                cv2.circle(frame, (int(kx * self.WIDTH), int(ky * self.HEIGHT)), 7, (0, 255, 0), -1)
 
         for edge, _ in self.EDGES.items():
             p1, p2 = edge
@@ -145,13 +150,13 @@ class VisionLegTracker(Node):
             if c1 > self.confidence_threshold and c2 > self.confidence_threshold:
                 cv2.line(
                     frame,
-                    (int(x1 * x), int(y1 * y)),
-                    (int(x2 * x), int(y2 * y)),
+                    (int(x1 * self.WIDTH), int(y1 * self.HEIGHT)),
+                    (int(x2 * self.WIDTH), int(y2 * self.HEIGHT)),
                     (255, 0, 0),
                     2,
                 )
 
-    def estimator(self, frame, interpreter, prevtime):
+    def estimator(self, frame):
         img = frame.copy()
         img = tf.expand_dims(img, axis=0)
         resized_image, _ = self.keep_aspect_ratio_resizer(img, self.input_size)
@@ -159,12 +164,31 @@ class VisionLegTracker(Node):
 
         # Make predictions
         currenttime = time.time()
-        keypoints_with_scores = self.detect(interpreter, image_tensor)
-        runtime = currenttime - prevtime
-        print("Runtime: ", runtime)
-        prevtime = currenttime
 
-        return keypoints_with_scores, prevtime
+        input_details = self.interpreter.get_input_details()
+        output_details = self.interpreter.get_output_details()
+
+        is_dynamic_shape_model = input_details[0]["shape_signature"][2] == -1
+
+        if is_dynamic_shape_model:
+            input_tensor_index = input_details[0]["index"]
+            input_shape = image_tensor.shape
+            self.interpreter.resize_tensor_input(
+                input_tensor_index, input_shape, strict=True
+            )
+
+        self.interpreter.allocate_tensors()
+        self.interpreter.set_tensor(input_details[0]["index"], image_tensor.numpy())
+
+        self.interpreter.invoke()
+
+        keypoints_with_scores = self.interpreter.get_tensor(output_details[0]["index"])
+
+        runtime = currenttime - self.prevtime
+        print("Runtime: ", runtime)
+        self.prevtime = currenttime
+
+        return keypoints_with_scores
 
     def keep_aspect_ratio_resizer(self, image, target_size):
         _, height, width, _ = image.shape
@@ -176,33 +200,10 @@ class VisionLegTracker(Node):
         image = tf.image.pad_to_bounding_box(image, 0, 0, target_height, target_width)
         return (image, (target_height, target_width))
 
-    def detect(self, interpreter, input_tensor):
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
-
-        is_dynamic_shape_model = input_details[0]["shape_signature"][2] == -1
-
-        if is_dynamic_shape_model:
-            input_tensor_index = input_details[0]["index"]
-            input_shape = input_tensor.shape
-            interpreter.resize_tensor_input(
-                input_tensor_index, input_shape, strict=True
-            )
-
-        interpreter.allocate_tensors()
-        interpreter.set_tensor(input_details[0]["index"], input_tensor.numpy())
-
-        interpreter.invoke()
-
-        keypoints_with_scores = interpreter.get_tensor(output_details[0]["index"])
-
-        return keypoints_with_scores
-
     def localization(self, frame, offset, intrinsics, bbox, depth_array):
-        y, x, _ = frame.shape
         if bbox[4] > self.confidence_threshold:
-            startpoint = (int(bbox[1] * x), int(bbox[0] * y))
-            endpoint = (int(bbox[3] * x), int(bbox[2] * y))
+            startpoint = (int(bbox[1] * self.WIDTH), int(bbox[0] * self.HEIGHT))
+            endpoint = (int(bbox[3] * self.WIDTH), int(bbox[2] * self.HEIGHT))
             x_pixel = int((startpoint[0] + endpoint[0]) / 2)
             y_pixel = int((startpoint[1] + endpoint[1]) / 2)
             depth = depth_array[y_pixel, x_pixel]  # row index, column index
@@ -232,9 +233,7 @@ class VisionLegTracker(Node):
         if self.intrinsics is None:
             self.intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
 
-        keypoints_with_scores, self.prevtime = self.estimator(
-            img, self.interpreter, self.prevtime
-        )
+        keypoints_with_scores = self.estimator(img)
 
         # Localization to get the world coordinates
         person_world_coords = []
@@ -250,13 +249,12 @@ class VisionLegTracker(Node):
             if (
                 bbox[4] > self.confidence_threshold
             ):  # Only proceed if confidence is above threshold
-                y, x, _ = img.shape
                 # Get the 3D world coordinates of the person
                 world_coords = self.localization(
                     img, self.offset, self.intrinsics, bbox, depth_image
                 )
-                startpoint = (int(bbox[1] * x), int(bbox[0] * y))
-                endpoint = (int(bbox[3] * x), int(bbox[2] * y))
+                startpoint = (int(bbox[1] * self.WIDTH), int(bbox[0] * self.HEIGHT))
+                endpoint = (int(bbox[3] * self.WIDTH), int(bbox[2] * self.HEIGHT))
                 x_pixel = int((startpoint[0] + endpoint[0]) / 2)
                 y_pixel = int((startpoint[1] + endpoint[1]) / 2)
                 cv2.circle(img, (x_pixel, y_pixel), 5, (0, 0, 255), -1)  # Red circle
