@@ -48,33 +48,21 @@ class VisionLegTracker(Node):
         self.fpsArr = []
         self.sumfps = 0
 
-        self.confidence_threshold = 0.4
+        self.confidence_threshold = 0.2
 
         self.EDGES = {
-            (0, 1): "m",
-            (0, 2): "c",
-            (1, 3): "m",
-            (2, 4): "c",
-            (0, 5): "m",
-            (0, 6): "c",
-            (5, 7): "m",
-            (7, 9): "m",
-            (6, 8): "c",
-            (8, 10): "c",
-            (5, 6): "y",
-            (5, 11): "m",
-            (6, 12): "c",
-            (11, 12): "y",
-            (11, 13): "m",
-            (13, 15): "m",
-            (12, 14): "c",
-            (14, 16): "c",
+            (0, 1): "m", (0, 2): "c", (1, 3): "m",
+            (2, 4): "c", (0, 5): "m", (0, 6): "c",
+            (5, 7): "m", (7, 9): "m", (6, 8): "c",
+            (8, 10): "c", (5, 6): "y", (5, 11): "m",
+            (6, 12): "c", (11, 12): "y", (11, 13): "m",
+            (13, 15): "m", (12, 14): "c", (14, 16): "c",
         }
 
-        self.input_size = 256
+        self.input_size = 190
 
         self.offset_x = 150.0
-        self.offset_y = 37
+        self.offset_y = 37.0
         self.offset_z = 0.0
         self.offset = [self.offset_x, self.offset_y, self.offset_z]
         # self.real_width = 220.0  # (mm) of the box
@@ -82,14 +70,6 @@ class VisionLegTracker(Node):
         self.intrinsics = None
 
         try:
-            # self.interpreter = tf.lite.Interpreter(
-            #     model_path="1.tflite",
-            #     experimental_delegates=[
-            #         load_delegate("libnvdsinfer_custom_impl.so")
-            #     ]
-            # )
-            # self.interpreter.allocate_tensors()
-
             self.interpreter = tf.lite.Interpreter(model_path="1.tflite")
             self.interpreter.allocate_tensors()
             self.get_logger().info("MoveNet loaded!")
@@ -218,15 +198,6 @@ class VisionLegTracker(Node):
 
         return keypoints_with_scores
 
-    def detectEachPerson(self, keypoints_with_scores, img):
-        for i in range(6):
-            bbox = keypoints_with_scores[0][i][51:57]
-            keypoints = keypoints_with_scores[0][i][:51]
-
-            # Rendering
-            self.draw(img, keypoints, bbox)
-        return img
-
     def localization(self, frame, offset, intrinsics, bbox, depth_array):
         y, x, _ = frame.shape
         if bbox[4] > self.confidence_threshold:
@@ -265,15 +236,17 @@ class VisionLegTracker(Node):
             img, self.interpreter, self.prevtime
         )
 
-        # Detect and process keypoints for each person
-        self.detectEachPerson(keypoints_with_scores, img)
-
         # Localization to get the world coordinates
         person_world_coords = []
         poses = PoseArray()
 
         for i in range(6):
             bbox = keypoints_with_scores[0][i][51:57]
+            keypoints = keypoints_with_scores[0][i][:51]
+
+            # Rendering
+            self.draw(img, keypoints, bbox)
+
             if (
                 bbox[4] > self.confidence_threshold
             ):  # Only proceed if confidence is above threshold
