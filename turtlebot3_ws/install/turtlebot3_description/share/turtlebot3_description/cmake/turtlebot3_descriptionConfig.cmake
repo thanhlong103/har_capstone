@@ -1,1 +1,1 @@
-/root/ros2_ws/build/turtlebot3_description/ament_cmake_core/turtlebot3_descriptionConfig.cmake
+/home/ntlong/ros2_ws/build/turtlebot3_description/ament_cmake_core/turtlebot3_descriptionConfig.cmake
