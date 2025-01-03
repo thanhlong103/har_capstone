@@ -6,7 +6,6 @@ from visualization_msgs.msg import Marker
 from std_msgs.msg import ColorRGBA
 import math
 
-
 class SocialCostmapNode(Node):
     def __init__(self):
         super().__init__("social_costmap_node")
@@ -58,19 +57,24 @@ class SocialCostmapNode(Node):
             # Check if the grid coordinates are within bounds
             if 0 <= grid_x < width and 0 <= grid_y < height:
                 # Apply Gaussian function to calculate cost based on distance
-                for dx in range(-width//2, width//2):
-                    for dy in range(-height//2, height//2):
+                for dx in range(-width // 2, width // 2):
+                    for dy in range(-height // 2, height // 2):
                         # Compute distance from the current grid cell to the human's position
-                        dist = math.sqrt((dx - grid_x)**2 + (dy - grid_y)**2)
+                        dist = math.sqrt((dx - grid_x) ** 2 + (dy - grid_y) ** 2)
                         cost = int(100 * math.exp(-0.5 * (dist**2) / (sigma**2)))
-                        
+
                         # Update the costmap data for the grid cell
                         if 0 <= grid_x + dx < width and 0 <= grid_y + dy < height:
-                            costmap.data[(grid_y + dy) * width + (grid_x + dx)] = min(100, max(costmap.data[(grid_y + dy) * width + (grid_x + dx)], cost))
-        
+                            costmap.data[(grid_y + dy) * width + (grid_x + dx)] = min(
+                                100,
+                                max(
+                                    costmap.data[(grid_y + dy) * width + (grid_x + dx)],
+                                    cost,
+                                ),
+                            )
+
         # Publish the costmap
         self.costmap_publisher.publish(costmap)
-
 
         # Publish the costmap
         self.costmap_publisher.publish(costmap)
