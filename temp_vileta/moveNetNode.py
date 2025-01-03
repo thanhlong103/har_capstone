@@ -25,7 +25,9 @@ class VisionLegTracker(Node):
         self.pipeline_wrapper = rs.pipeline_wrapper(self.pipe)
         self.pipeline_profile = self.cfg.resolve(self.pipeline_wrapper)
         self.device = self.pipeline_profile.get_device()
-        self.device_product_line = str(self.device.get_info(rs.camera_info.product_line))
+        self.device_product_line = str(
+            self.device.get_info(rs.camera_info.product_line)
+        )
 
         self.cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
         self.cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
@@ -72,7 +74,7 @@ class VisionLegTracker(Node):
         # self.threshold = 300  # (mm)
         self.intrinsics = None
 
-        self.prev_person_pos = [0.0,0.0,0.0]
+        self.prev_person_pos = [0.0, 0.0, 0.0]
 
         try:
             self.interpreter = tf.lite.Interpreter(model_path="1.tflite")
@@ -217,12 +219,12 @@ class VisionLegTracker(Node):
                 # Scale the coordinates
                 keypoints[i] = x * self.WIDTH
                 keypoints[i + 1] = y * self.HEIGHT
-                
+
                 # Validate indices to avoid IndexError
                 row = int(keypoints[i])
-                col = int(keypoints[i+1])
+                col = int(keypoints[i + 1])
                 if 0 <= row < depth_array.shape[0] and 0 <= col < depth_array.shape[1]:
-                    depth = depth_frame.get_distance(row,col)  # Access depth value
+                    depth = depth_frame.get_distance(row, col)  # Access depth value
                     coordinate_camera = rs.rs2_deproject_pixel_to_point(
                         intrinsics, [keypoints[i], keypoints[i + 1]], depth
                     )
@@ -232,9 +234,9 @@ class VisionLegTracker(Node):
                     keypoints[i + 2] = coordinate_camera[2]
                 else:
                     # Set default values or handle the out-of-bounds case
-                    keypoints[i] = None
-                    keypoints[i + 1] = None
-                    keypoints[i + 2] = None
+                    keypoints[i] = 0
+                    keypoints[i + 1] = 0
+                    keypoints[i + 2] = 0
         return keypoints
 
     def processImage(self):
@@ -253,7 +255,9 @@ class VisionLegTracker(Node):
         depth_image = np.asanyarray(depth_frame.get_data())
 
         # Convert depth image to 3-channel grayscale for visualization
-        depth_visual = cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        depth_visual = cv2.normalize(
+            depth_image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
+        )
         depth_visual = cv2.cvtColor(depth_visual, cv2.COLOR_GRAY2BGR)
 
         # Initialize camera intrinsics if not done
@@ -270,18 +274,20 @@ class VisionLegTracker(Node):
             bbox = keypoints_with_scores[0][i][51:57]
             keypoints_draw = keypoints_with_scores[0][i][:51]
 
-            keypoints_draw[15] = keypoints_draw[15] + 50.0/self.WIDTH
-            keypoints_draw[16] = keypoints_draw[16] - 25.0/self.HEIGHT
+            keypoints_draw[15] = keypoints_draw[15] + 50.0 / self.WIDTH
+            keypoints_draw[16] = keypoints_draw[16] - 25.0 / self.HEIGHT
 
-            keypoints_draw[18] = keypoints_draw[18] + 50.0/self.WIDTH
-            keypoints_draw[19] = keypoints_draw[19] + 25.0/self.HEIGHT
+            keypoints_draw[18] = keypoints_draw[18] + 50.0 / self.WIDTH
+            keypoints_draw[19] = keypoints_draw[19] + 25.0 / self.HEIGHT
             # print(i, keypoints)
 
             # Rendering
             self.draw(depth_visual, keypoints_draw, bbox)
             self.draw(img, keypoints_draw, bbox)
 
-            keypoints = self.process_keypoints(self.intrinsics, keypoints_draw, depth_image, depth_frame)
+            keypoints = self.process_keypoints(
+                self.intrinsics, keypoints_draw, depth_image, depth_frame
+            )
 
             # print(keypoints)
 
@@ -289,36 +295,41 @@ class VisionLegTracker(Node):
                 left_shoulder = [keypoints[17], keypoints[15]]
                 right_shoulder = [keypoints[20], keypoints[18]]
 
-                print(left_shoulder, right_shoulder)
+                # print(left_shoulder, right_shoulder)
 
                 # Calculate vector d
-                d = (left_shoulder[0] - right_shoulder[0], left_shoulder[1] - right_shoulder[1])
+                d = (
+                    left_shoulder[0] - right_shoulder[0],
+                    left_shoulder[1] - right_shoulder[1],
+                )
 
                 # Apply rotation matrix R (90 degrees)
                 d_rotated = (-d[1], d[0])
 
                 # Normalize the vector
-                magnitude = math.sqrt(d_rotated[0]**2 + d_rotated[1]**2)
+                magnitude = math.sqrt(d_rotated[0] ** 2 + d_rotated[1] ** 2)
                 if magnitude == 0:
                     print("Warning: Magnitude is zero. {'x': 0, 'y': 0, 'theta': 0}")
                     x, y, theta = self.prev_person_pos
 
-                else :
-                    x = (left_shoulder[0] + right_shoulder[0])/2
-                    y = (left_shoulder[1] + right_shoulder[1])/2
+                else:
+                    x = (left_shoulder[0] + right_shoulder[0]) / 2
+                    y = (left_shoulder[1] + right_shoulder[1]) / 2
 
-                    if (x >= 3):
+                    if x >= 3:
                         x, y, theta = self.prev_person_pos
 
-                    x_theta = d[0] / magnitude
-                    y_theta = d[1] / magnitude
-                    
+                    x_theta = d_rotated[0] / magnitude
+                    y_theta = d_rotated[1] / magnitude
+
                     # Calculate angle theta in degrees
                     theta = math.degrees(math.atan2(y_theta, x_theta))
-                    
-                    print(x,y,theta)
 
-                self.prev_person_pos = [x,y,theta]
+                    theta = math.radians(theta)
+
+                    print(x, y, theta)
+
+                self.prev_person_pos = [x, y, theta]
 
                 world_coords = [x, y, theta]
                 if world_coords:
@@ -328,8 +339,9 @@ class VisionLegTracker(Node):
                     pose.position.x = world_coords[0]
                     pose.position.y = -world_coords[1]
                     # pose.position.z = world_coords[2]/100
-                    pose.orientation.z = -int(world_coords[2]) * 0.017
-                    pose.orientation.z = 0.0
+                    pose.orientation.z = math.sin(-int(world_coords[2]) / 2.0)
+                    pose.orientation.w = math.cos(-int(world_coords[2]) / 2.0)
+                    # pose.orientation.z = theta
                     poses.poses.append(pose)
 
         # Log the world coordinates for debugging
@@ -337,7 +349,7 @@ class VisionLegTracker(Node):
         #     for i, coords in enumerate(person_world_coords):
         #         print(f"Person {i+1} World Coordinates: {coords}")
 
-                # Publish the PoseArray if there are valid coordinates
+        # Publish the PoseArray if there are valid coordinates
         if poses.poses:
             poses.header.frame_id = "camera_frame"  # Replace with your camera frame
             poses.header.stamp = self.get_clock().now().to_msg()
@@ -361,9 +373,12 @@ class VisionLegTracker(Node):
             sumfps = 0
 
         cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
-        cv2.imshow("Image", img)
+        # Stack both images horizontally
+        images = np.hstack((img, depth_visual))
+
+        cv2.imshow("People Detected", images)
         # cv2.imshow("depth", depth_image)
-        cv2.imshow("depth", depth_visual)
+        # cv2.imshow("depth", depth_visual)
 
         if cv2.waitKey(1) == ord("q"):
             self.pipe.stop()
