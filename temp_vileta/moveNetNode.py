@@ -100,6 +100,10 @@ class VisionLegTracker(Node):
         img = np.asanyarray(color_frame.get_data())
         self.HEIGHT, self.WIDTH, _ = img.shape
 
+        # Align object - aligning depth to color
+        self.align_to = rs.stream.color
+        self.align = rs.align(self.align_to)
+
     def broadcast_camera_frame(self):
         # Create a TransformStamped message
         t = TransformStamped()
@@ -235,8 +239,16 @@ class VisionLegTracker(Node):
 
     def processImage(self):
         frame = self.pipe.wait_for_frames()
-        color_frame = frame.get_color_frame()
-        depth_frame = frame.get_depth_frame()
+
+        aligned_frames = self.align.process(frame)
+
+        # Get aligned frames
+        depth_frame = aligned_frames.get_depth_frame()
+        color_frame = aligned_frames.get_color_frame()
+
+        # color_frame = frame.get_color_frame()
+        # depth_frame = frame.get_depth_frame()
+
         img = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
@@ -268,8 +280,6 @@ class VisionLegTracker(Node):
             # Rendering
             self.draw(depth_visual, keypoints_draw, bbox)
             self.draw(img, keypoints_draw, bbox)
-
-
 
             keypoints = self.process_keypoints(self.intrinsics, keypoints_draw, depth_image, depth_frame)
 
