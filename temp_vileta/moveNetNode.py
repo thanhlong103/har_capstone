@@ -59,7 +59,7 @@ class VisionLegTracker(Node):
             (13, 15): "m", (12, 14): "c", (14, 16): "c",
         }
 
-        self.input_size = 128
+        self.input_size = 256
 
         self.offset_x = 150.0
         self.offset_y = 37.0

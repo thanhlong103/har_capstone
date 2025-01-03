@@ -2,7 +2,7 @@
 
 docker pull ghcr.io/sloretz/ros:humble-desktop
 docker build -t ros2_humble_custom .
-docker run -it --volume /home/ntlong/har_capstone/turtlebot3_ws/:/root/ros2_ws --network host --device=/dev/ttyACM0 --device=/dev/ttyUSB0 --rm 
+docker run -it --volume /home/ntlong/har_capstone/turtlebot3_ws/:/root/ros2_ws --network host --device=/dev/ttyACM0 --device=/dev/ttyUSB0 --rm ros2_foxy_opencv_3.4.12
 docker exec -it b83c8f477b87 bash
 
 #Launch Robot
