@@ -50,7 +50,7 @@ class VisionLegTracker(Node):
         self.fpsArr = []
         self.sumfps = 0
 
-        self.confidence_threshold = 0.4
+        self.confidence_threshold = 0.2
 
         self.EDGES = {
             (0, 1): "m", (0, 2): "c", (1, 3): "m",
