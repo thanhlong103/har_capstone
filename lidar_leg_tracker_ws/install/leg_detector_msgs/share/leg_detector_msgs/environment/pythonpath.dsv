@@ -1,1 +1,1 @@
-prepend-non-duplicate;PYTHONPATH;lib/python3.8/site-packages
+/root/ros2_ws/build/leg_detector_msgs/ament_cmake_environment_hooks/pythonpath.dsv

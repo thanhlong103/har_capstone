@@ -1,3 +1,1 @@
-# Array of person positions
-std_msgs/Header header
-Person[] people
+/root/ros2_ws/src/ros2_leg_detector/src/leg_detector_msgs/msg/PersonArray.msg

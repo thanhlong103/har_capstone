@@ -1,3 +1,1 @@
-# Array of legs 
-std_msgs/Header header
-Leg[] legs
+/root/ros2_ws/src/ros2_leg_detector/src/leg_detector_msgs/msg/LegArray.msg

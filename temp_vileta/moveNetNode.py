@@ -7,14 +7,11 @@ import pyrealsense2 as rs
 from tensorflow.keras.models import load_model
 import math
 import time
-import os
 import pandas as pd
-from matplotlib import pyplot as plt
-from geometry_msgs.msg import PointStamped
+from tf_transformations import quaternion_from_euler
 from geometry_msgs.msg import PoseArray, Pose
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
-
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -53,7 +50,7 @@ class VisionLegTracker(Node):
         self.fpsArr = []
         self.sumfps = 0
 
-        self.confidence_threshold = 0.3
+        self.confidence_threshold = 0.4
 
         self.EDGES = {
             (0, 1): "m", (0, 2): "c", (1, 3): "m",
@@ -116,7 +113,7 @@ class VisionLegTracker(Node):
         # Define translation (position) of the camera
         t.transform.translation.x = 0.0
         t.transform.translation.y = -0.3
-        t.transform.translation.z = 0.0
+        t.transform.translation.z = 0.2
 
         # Define rotation (orientation) of the camera
         t.transform.rotation.x = 0.0
@@ -223,15 +220,21 @@ class VisionLegTracker(Node):
                 # Validate indices to avoid IndexError
                 row = int(keypoints[i])
                 col = int(keypoints[i + 1])
-                if 0 <= row < depth_array.shape[0] and 0 <= col < depth_array.shape[1]:
-                    depth = depth_frame.get_distance(row, col)  # Access depth value
-                    coordinate_camera = rs.rs2_deproject_pixel_to_point(
-                        intrinsics, [keypoints[i], keypoints[i + 1]], depth
-                    )
-                    # Remapping from camera to world
-                    keypoints[i] = coordinate_camera[0]
-                    keypoints[i + 1] = coordinate_camera[1]
-                    keypoints[i + 2] = coordinate_camera[2]
+                if 0 <= row < depth_array.shape[1] and 0 <= col < depth_array.shape[0]:
+                    try:
+                        depth = depth_frame.get_distance(row, col)  # Access depth value
+                        coordinate_camera = rs.rs2_deproject_pixel_to_point(
+                            intrinsics, [keypoints[i], keypoints[i + 1]], depth
+                        )
+                        # Remapping from camera to world
+                        keypoints[i] = coordinate_camera[0]
+                        keypoints[i + 1] = coordinate_camera[1]
+                        keypoints[i + 2] = coordinate_camera[2]
+                    except:
+                        # Set default values or handle the out-of-bounds case
+                        keypoints[i] = 0
+                        keypoints[i + 1] = 0
+                        keypoints[i + 2] = 0
                 else:
                     # Set default values or handle the out-of-bounds case
                     keypoints[i] = 0
@@ -247,9 +250,6 @@ class VisionLegTracker(Node):
         # Get aligned frames
         depth_frame = aligned_frames.get_depth_frame()
         color_frame = aligned_frames.get_color_frame()
-
-        # color_frame = frame.get_color_frame()
-        # depth_frame = frame.get_depth_frame()
 
         img = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
@@ -274,11 +274,23 @@ class VisionLegTracker(Node):
             bbox = keypoints_with_scores[0][i][51:57]
             keypoints_draw = keypoints_with_scores[0][i][:51]
 
-            keypoints_draw[15] = keypoints_draw[15] + 50.0 / self.WIDTH
+            # if (keypoints_draw[15] - keypoints_draw[17] < 0):
+            keypoints_draw[15] = keypoints_draw[15] + 40.0 / self.WIDTH
             keypoints_draw[16] = keypoints_draw[16] - 25.0 / self.HEIGHT
 
-            keypoints_draw[18] = keypoints_draw[18] + 50.0 / self.WIDTH
+            keypoints_draw[18] = keypoints_draw[18] + 40.0 / self.WIDTH
             keypoints_draw[19] = keypoints_draw[19] + 25.0 / self.HEIGHT
+            # else:
+            #     keypoints_draw[15] = keypoints_draw[15] 
+            #     keypoints_draw[16] = keypoints_draw[16] 
+            #     keypoints_draw[18] = keypoints_draw[18] 
+            #     keypoints_draw[19] = keypoints_draw[19]
+
+                # keypoints_draw[15] = keypoints_draw[15] - 50.0 / self.WIDTH
+                # keypoints_draw[16] = keypoints_draw[16] + 25.0 / self.HEIGHT
+
+                # keypoints_draw[18] = keypoints_draw[18] + 50.0 / self.WIDTH
+                # keypoints_draw[19] = keypoints_draw[19] + 25.0 / self.HEIGHT
             # print(i, keypoints)
 
             # Rendering
@@ -308,7 +320,7 @@ class VisionLegTracker(Node):
 
                 # Normalize the vector
                 magnitude = math.sqrt(d_rotated[0] ** 2 + d_rotated[1] ** 2)
-                if magnitude == 0:
+                if ((magnitude == 0) | (left_shoulder[0] < 0.15)):
                     print("Warning: Magnitude is zero. {'x': 0, 'y': 0, 'theta': 0}")
                     x, y, theta = self.prev_person_pos
 
@@ -327,7 +339,7 @@ class VisionLegTracker(Node):
 
                     theta = math.radians(theta)
 
-                    print(x, y, theta)
+                    self.get_logger().info(f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)")
 
                 self.prev_person_pos = [x, y, theta]
 
@@ -339,8 +351,12 @@ class VisionLegTracker(Node):
                     pose.position.x = world_coords[0]
                     pose.position.y = -world_coords[1]
                     # pose.position.z = world_coords[2]/100
-                    pose.orientation.z = math.sin(-int(world_coords[2]) / 2.0)
-                    pose.orientation.w = math.cos(-int(world_coords[2]) / 2.0)
+                    q = quaternion_from_euler(0, 0, -theta)
+                    pose.orientation.x = q[0]
+                    pose.orientation.y = q[1]
+                    pose.orientation.z = q[2]
+                    pose.orientation.w = q[3]
+
                     # pose.orientation.z = theta
                     poses.poses.append(pose)
 

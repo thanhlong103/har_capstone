@@ -1,4 +1,1 @@
-# Pose of a person
-geometry_msgs/Pose pose
-geometry_msgs/Point velocity # custom attribute
-uint32 id
+/root/ros2_ws/src/ros2_leg_detector/src/leg_detector_msgs/msg/Person.msg
