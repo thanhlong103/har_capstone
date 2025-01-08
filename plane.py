@@ -166,7 +166,8 @@ ax.text(center[0] + 0.1, center[1] + 0.1, center[2] + 0.1, angle_text, color='bl
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_zlabel('Z')
-ax.legend()
+# ax.legend(handles=[])
+# ax.legend(handles=[plane_proxy], loc='upper left')
 
 print(f"The angle between the estimated plane and the plane perpendicular to Oy is {angle_degrees:.2f} degrees.")
 plt.show()
