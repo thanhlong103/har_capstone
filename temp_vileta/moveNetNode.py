@@ -12,6 +12,7 @@ from tf_transformations import quaternion_from_euler
 from geometry_msgs.msg import PoseArray, Pose
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
+# from sklearn.decomposition import PCA
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -61,7 +62,7 @@ class VisionLegTracker(Node):
             (13, 15): "m", (12, 14): "c", (14, 16): "c",
         }
 
-        self.input_size = 192
+        self.input_size = 128
 
         self.offset_x = 150.0
         self.offset_y = 37.0
@@ -102,6 +103,8 @@ class VisionLegTracker(Node):
         # Align object - aligning depth to color
         self.align_to = rs.stream.color
         self.align = rs.align(self.align_to)
+
+        # self.pca = PCA(n_components=2)
 
     def broadcast_camera_frame(self):
         # Create a TransformStamped message
@@ -209,6 +212,7 @@ class VisionLegTracker(Node):
         return (image, (target_height, target_width))
 
     def process_keypoints(self, intrinsics, keypoints, depth_array, depth_frame):
+        nice_keypoints=[]
         # Iterate over the list in chunks of 3
         for i in range(0, len(keypoints), 3):
             y, x, confidence = keypoints[i], keypoints[i + 1], keypoints[i + 2]
@@ -230,6 +234,8 @@ class VisionLegTracker(Node):
                         keypoints[i] = coordinate_camera[0]
                         keypoints[i + 1] = coordinate_camera[1]
                         keypoints[i + 2] = coordinate_camera[2]
+                        xyz_keypoint = [keypoints[i+2],keypoints[i],keypoints[i + 1]]
+                        nice_keypoints.append(xyz_keypoint)
                     except:
                         # Set default values or handle the out-of-bounds case
                         keypoints[i] = 0
@@ -240,7 +246,35 @@ class VisionLegTracker(Node):
                     keypoints[i] = 0
                     keypoints[i + 1] = 0
                     keypoints[i + 2] = 0
-        return keypoints
+        return nice_keypoints
+    
+    def estimate_plane_pca(self, points):
+        """
+        Estimates a plane from a given set of 3D points using PCA.
+        
+        Parameters:
+            points (numpy.ndarray): A (N, 3) array of 3D points.
+            
+        Returns:
+            plane_normal (numpy.ndarray): A (3,) vector representing the plane's normal.
+            plane_point (numpy.ndarray): A (3,) vector representing a point on the plane (centroid).
+        """
+        # Step 1: Compute the centroid (mean) of the points
+        centroid = np.mean(points, axis=0)
+        
+        # Step 2: Center the points by subtracting the centroid
+        centered_points = points - centroid
+        
+        # Step 3: Compute the covariance matrix
+        covariance_matrix = np.cov(centered_points, rowvar=False)
+        
+        # Step 4: Perform eigen decomposition
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+        
+        # Step 5: The normal vector to the plane is the eigenvector associated with the smallest eigenvalue
+        normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
+        
+        return normal_vector, centroid
 
     def processImage(self):
         frame = self.pipe.wait_for_frames()
@@ -274,72 +308,57 @@ class VisionLegTracker(Node):
             bbox = keypoints_with_scores[0][i][51:57]
             keypoints_draw = keypoints_with_scores[0][i][:51]
 
-            # if (keypoints_draw[15] - keypoints_draw[17] < 0):
-            keypoints_draw[15] = keypoints_draw[15] + 40.0 / self.WIDTH
-            keypoints_draw[16] = keypoints_draw[16] - 25.0 / self.HEIGHT
+            # keypoints_draw[15] = keypoints_draw[15] + 40.0 / self.WIDTH
+            # keypoints_draw[16] = keypoints_draw[16] - 25.0 / self.HEIGHT
 
-            keypoints_draw[18] = keypoints_draw[18] + 40.0 / self.WIDTH
-            keypoints_draw[19] = keypoints_draw[19] + 25.0 / self.HEIGHT
-            # else:
-            #     keypoints_draw[15] = keypoints_draw[15] 
-            #     keypoints_draw[16] = keypoints_draw[16] 
-            #     keypoints_draw[18] = keypoints_draw[18] 
-            #     keypoints_draw[19] = keypoints_draw[19]
-
-                # keypoints_draw[15] = keypoints_draw[15] - 50.0 / self.WIDTH
-                # keypoints_draw[16] = keypoints_draw[16] + 25.0 / self.HEIGHT
-
-                # keypoints_draw[18] = keypoints_draw[18] + 50.0 / self.WIDTH
-                # keypoints_draw[19] = keypoints_draw[19] + 25.0 / self.HEIGHT
-            # print(i, keypoints)
+            # keypoints_draw[18] = keypoints_draw[18] + 40.0 / self.WIDTH
+            # keypoints_draw[19] = keypoints_draw[19] + 25.0 / self.HEIGHT
 
             # Rendering
             self.draw(depth_visual, keypoints_draw, bbox)
             self.draw(img, keypoints_draw, bbox)
 
-            keypoints = self.process_keypoints(
+            keypoints = np.array(self.process_keypoints(
                 self.intrinsics, keypoints_draw, depth_image, depth_frame
-            )
-
-            # print(keypoints)
+            ))
 
             if bbox[4] > self.confidence_threshold:
-                left_shoulder = [keypoints[17], keypoints[15]]
-                right_shoulder = [keypoints[20], keypoints[18]]
+                normal, centroid = self.estimate_plane_pca(keypoints)
 
-                # print(left_shoulder, right_shoulder)
+                A,B,C = normal
+                D = np.dot(normal, centroid)
 
-                # Calculate vector d
-                d = (
-                    left_shoulder[0] - right_shoulder[0],
-                    left_shoulder[1] - right_shoulder[1],
-                )
+                normal_perpendicular = np.array([1,0,0])
 
-                # Apply rotation matrix R (90 degrees)
-                d_rotated = (-d[1], d[0])
+                print("NORMAL VECTOR:", normal )
 
-                # Normalize the vector
-                magnitude = math.sqrt(d_rotated[0] ** 2 + d_rotated[1] ** 2)
-                if ((magnitude == 0) | (left_shoulder[0] < 0.15)):
-                    print("Warning: Magnitude is zero. {'x': 0, 'y': 0, 'theta': 0}")
-                    x, y, theta = self.prev_person_pos
+                dot_product = np.dot(normal, normal_perpendicular)
 
+                # Calculate the magnitudes of the normal vectors
+                magnitude_estimated = np.linalg.norm(normal)
+                magnitude_perpendicular = np.linalg.norm(normal_perpendicular)
+
+                # Calculate the cosine of the angle
+                cos_angle = dot_product / (magnitude_estimated * magnitude_perpendicular)
+
+                # Calculate the angle in radians
+                theta = np.arccos(cos_angle)
+
+                # Convert the angle to degrees
+                angle_degrees = np.degrees(theta)
+
+                theta = np.radians(angle_degrees)
+
+                if B < 0:
+                    theta = theta
                 else:
-                    x = (left_shoulder[0] + right_shoulder[0]) / 2
-                    y = (left_shoulder[1] + right_shoulder[1]) / 2
+                    theta = -theta
 
-                    if x >= 3:
-                        x, y, theta = self.prev_person_pos
+                # Plane equation
+                print(f"Plane equation: {A:.4f}x + {B:.4f}y + {C:.4f}z + {D:.4f} = 0")
 
-                    x_theta = d_rotated[0] / magnitude
-                    y_theta = d_rotated[1] / magnitude
-
-                    # Calculate angle theta in degrees
-                    theta = math.degrees(math.atan2(y_theta, x_theta))
-
-                    theta = math.radians(theta)
-
-                    self.get_logger().info(f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)")
+                x = float(centroid[0])
+                y = float(centroid[2])
 
                 self.prev_person_pos = [x, y, theta]
 
@@ -351,7 +370,7 @@ class VisionLegTracker(Node):
                     pose.position.x = world_coords[0]
                     pose.position.y = -world_coords[1]
                     # pose.position.z = world_coords[2]/100
-                    q = quaternion_from_euler(0, 0, -theta)
+                    q = quaternion_from_euler(0, 0, theta-3.14)
                     pose.orientation.x = q[0]
                     pose.orientation.y = q[1]
                     pose.orientation.z = q[2]
@@ -360,6 +379,7 @@ class VisionLegTracker(Node):
                     # pose.orientation.z = theta
                     poses.poses.append(pose)
 
+                    self.get_logger().info(f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)")
         # Log the world coordinates for debugging
         # if person_world_coords:
         #     for i, coords in enumerate(person_world_coords):

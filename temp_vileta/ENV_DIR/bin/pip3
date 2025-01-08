@@ -1,4 +1,4 @@
-#!/home/ntlong/har_capstone/temp_vileta/tf/bin/python
+#!/home/ntlong/har_capstone/temp_vileta/ENV_DIR/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
