@@ -12,6 +12,8 @@ from tf_transformations import quaternion_from_euler
 from geometry_msgs.msg import PoseArray, Pose
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
+from visualization_msgs.msg import Marker
+from visualization_msgs.msg import MarkerArray
 # from sklearn.decomposition import PCA
 
 class VisionLegTracker(Node):
@@ -51,7 +53,8 @@ class VisionLegTracker(Node):
         self.fpsArr = []
         self.sumfps = 0
 
-        self.confidence_threshold = 0.2
+        self.confidence_threshold = 0.25
+        self.bbox_threshold = 0.15
 
         self.EDGES = {
             (0, 1): "m", (0, 2): "c", (1, 3): "m",
@@ -87,6 +90,7 @@ class VisionLegTracker(Node):
         self.coord_publisher = self.create_publisher(
             PoseArray, "/person_coordinates", 10
         )
+        self.marker_publisher = self.create_publisher(MarkerArray, "/human_markers", 10)
 
         # Define the static transform broadcaster
         self.tf_broadcaster = StaticTransformBroadcaster(self)
@@ -129,7 +133,7 @@ class VisionLegTracker(Node):
         self.get_logger().info("Camera frame transform broadcasted.")
 
     def draw(self, frame, keypoints, bbox):
-        if bbox[4] > self.confidence_threshold:
+        if bbox[4] > self.bbox_threshold:
             startpoint = (int(bbox[1] * self.WIDTH), int(bbox[0] * self.HEIGHT))
             endpoint = (int(bbox[3] * self.WIDTH), int(bbox[2] * self.HEIGHT))
             thickness = 2
@@ -213,7 +217,7 @@ class VisionLegTracker(Node):
 
     def process_keypoints(self, intrinsics, keypoints, depth_array, depth_frame):
         nice_keypoints=[]
-        # Iterate over the list in chunks of 3
+        
         for i in range(0, len(keypoints), 3):
             y, x, confidence = keypoints[i], keypoints[i + 1], keypoints[i + 2]
             if confidence > self.confidence_threshold:
@@ -234,6 +238,7 @@ class VisionLegTracker(Node):
                         keypoints[i] = coordinate_camera[0]
                         keypoints[i + 1] = coordinate_camera[1]
                         keypoints[i + 2] = coordinate_camera[2]
+
                         xyz_keypoint = [keypoints[i+2],keypoints[i],keypoints[i + 1]]
                         nice_keypoints.append(xyz_keypoint)
                     except:
@@ -246,6 +251,7 @@ class VisionLegTracker(Node):
                     keypoints[i] = 0
                     keypoints[i + 1] = 0
                     keypoints[i + 2] = 0
+
         return nice_keypoints
     
     def estimate_plane_pca(self, points):
@@ -259,19 +265,22 @@ class VisionLegTracker(Node):
             plane_normal (numpy.ndarray): A (3,) vector representing the plane's normal.
             plane_point (numpy.ndarray): A (3,) vector representing a point on the plane (centroid).
         """
-        # Step 1: Compute the centroid (mean) of the points
+
+        # if len(points) > 0:
+        #     return [], []
+        # Compute the centroid (mean) of the points
         centroid = np.mean(points, axis=0)
         
-        # Step 2: Center the points by subtracting the centroid
+        # Center the points by subtracting the centroid
         centered_points = points - centroid
         
-        # Step 3: Compute the covariance matrix
+        # Compute the covariance matrix
         covariance_matrix = np.cov(centered_points, rowvar=False)
         
-        # Step 4: Perform eigen decomposition
+        # Perform eigen decomposition
         eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
         
-        # Step 5: The normal vector to the plane is the eigenvector associated with the smallest eigenvalue
+        # The normal vector to the plane is the eigenvector associated with the smallest eigenvalue
         normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
         
         return normal_vector, centroid
@@ -303,6 +312,7 @@ class VisionLegTracker(Node):
         # Localization to get the world coordinates
         person_world_coords = []
         poses = PoseArray()
+        marker_array = MarkerArray() 
 
         for i in range(6):
             bbox = keypoints_with_scores[0][i][51:57]
@@ -313,24 +323,33 @@ class VisionLegTracker(Node):
 
             # keypoints_draw[18] = keypoints_draw[18] + 40.0 / self.WIDTH
             # keypoints_draw[19] = keypoints_draw[19] + 25.0 / self.HEIGHT
+            right_shoulder = tuple([int(keypoints_draw[16]*self.WIDTH), int(keypoints_draw[15]*self.HEIGHT)])
+            left_shoulder = tuple([int(keypoints_draw[19]*self.WIDTH), int(keypoints_draw[18]*self.HEIGHT)])
+
+            print(left_shoulder, right_shoulder)
 
             # Rendering
             self.draw(depth_visual, keypoints_draw, bbox)
             self.draw(img, keypoints_draw, bbox)
 
-            keypoints = np.array(self.process_keypoints(
+            keypoints = self.process_keypoints(
                 self.intrinsics, keypoints_draw, depth_image, depth_frame
-            ))
+            )
 
-            if bbox[4] > self.confidence_threshold:
+            if bbox[4] > self.bbox_threshold:
+                cv2.rectangle(img, left_shoulder, right_shoulder, (0, 255, 0), 2)  # Fill with blue
+
                 normal, centroid = self.estimate_plane_pca(keypoints)
+
+                # if normal == []:
+                #     continue
 
                 A,B,C = normal
                 D = np.dot(normal, centroid)
 
                 normal_perpendicular = np.array([1,0,0])
 
-                print("NORMAL VECTOR:", normal )
+                # print("NORMAL VECTOR:", normal )
 
                 dot_product = np.dot(normal, normal_perpendicular)
 
@@ -379,17 +398,40 @@ class VisionLegTracker(Node):
                     # pose.orientation.z = theta
                     poses.poses.append(pose)
 
-                    self.get_logger().info(f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)")
-        # Log the world coordinates for debugging
-        # if person_world_coords:
-        #     for i, coords in enumerate(person_world_coords):
-        #         print(f"Person {i+1} World Coordinates: {coords}")
+                    # Create a marker for the human
+                    marker = Marker()
+                    marker.header.frame_id = "camera_frame"
+                    marker.header.stamp = self.get_clock().now().to_msg()
+                    marker.ns = "humans"
+                    marker.id = i
+                    marker.type = Marker.SPHERE
+                    marker.action = Marker.ADD
+                    marker.pose.position.x = world_coords[0]
+                    marker.pose.position.y = -world_coords[1]
+                    # marker.pose.position.z = float(centroid[2])
+                    # marker.pose.orientation.x = 0.0
+                    # marker.pose.orientation.y = 0.0
+                    # marker.pose.orientation.z = 0.0
+                    # marker.pose.orientation.w = 1.0
+                    marker.scale.x = 0.25
+                    marker.scale.y = 0.25
+                    marker.scale.z = 0.25
+                    marker.color.a = 1.0  # Alpha (transparency)
+                    marker.color.r = 0.0
+                    marker.color.g = 1.0
+                    marker.color.b = 0.0  # Red color
 
+                    marker_array.markers.append(marker)
+
+                    self.get_logger().info(f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)")
+                    
         # Publish the PoseArray if there are valid coordinates
         if poses.poses:
             poses.header.frame_id = "camera_frame"  # Replace with your camera frame
             poses.header.stamp = self.get_clock().now().to_msg()
             self.coord_publisher.publish(poses)
+            # Publish MarkerArray
+            self.marker_publisher.publish(marker_array)
 
         # Display FPS
         font = cv2.FONT_HERSHEY_SIMPLEX
