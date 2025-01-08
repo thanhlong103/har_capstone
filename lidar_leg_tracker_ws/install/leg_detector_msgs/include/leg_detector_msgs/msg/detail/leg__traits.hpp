@@ -1,1 +1,0 @@
-/root/ros2_ws/build/leg_detector_msgs/rosidl_generator_cpp/leg_detector_msgs/msg/detail/leg__traits.hpp

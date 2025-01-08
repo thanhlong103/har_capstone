@@ -1,1 +1,0 @@
-/root/ros2_ws/build/leg_detector/ament_cmake_core/leg_detectorConfig.cmake

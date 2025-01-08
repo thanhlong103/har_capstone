@@ -1,1 +1,0 @@
-/root/ros2_ws/build/leg_detector_msgs/ament_cmake_core/leg_detector_msgsConfig-version.cmake

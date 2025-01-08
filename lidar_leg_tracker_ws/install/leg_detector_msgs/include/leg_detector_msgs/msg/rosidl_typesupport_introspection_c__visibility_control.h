@@ -1,1 +1,0 @@
-/root/ros2_ws/build/leg_detector_msgs/rosidl_typesupport_introspection_c/leg_detector_msgs/msg/rosidl_typesupport_introspection_c__visibility_control.h

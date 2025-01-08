@@ -1,1 +1,0 @@
-/root/ros2_ws/src/ros2_leg_detector/src/leg_detector/launch/lidar_leg_tracker.launch.py

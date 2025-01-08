@@ -1,1 +1,0 @@
-/root/ros2_ws/build/leg_detector/ament_cmake_environment_hooks/local_setup.sh
