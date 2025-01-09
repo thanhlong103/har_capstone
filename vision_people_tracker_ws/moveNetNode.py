@@ -14,6 +14,7 @@ from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
+# from sklearn.decomposition import PCA
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -37,19 +38,6 @@ class VisionLegTracker(Node):
         self.prevAct = time.time()
         self.i = 0
         self.warmup_frames = 60
-
-        # Define the camera frame's static transform
-        self.broadcast_camera_frame()
-
-        # Frame width and height
-        frame = self.pipe.wait_for_frames()
-        color_frame = frame.get_color_frame()
-        img = np.asanyarray(color_frame.get_data())
-        self.HEIGHT, self.WIDTH, _ = img.shape
-
-        # Align object - aligning depth to color
-        self.align_to = rs.stream.color
-        self.align = rs.align(self.align_to)
 
         # cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.pipe.start(self.cfg)
@@ -94,6 +82,8 @@ class VisionLegTracker(Node):
         except:
             print("Can not access the model!")
 
+        self.get_logger().info("Vision Leg Tracker Node has started.")
+
         # Add a publisher for person coordinates
         self.coord_publisher = self.create_publisher(
             PoseArray, "/person_coordinates", 10
@@ -103,7 +93,18 @@ class VisionLegTracker(Node):
         # Define the static transform broadcaster
         self.tf_broadcaster = StaticTransformBroadcaster(self)
 
-        self.get_logger().info("Vision Leg Tracker Node has started.")
+        # Define the camera frame's static transform
+        self.broadcast_camera_frame()
+
+        # Frame width and height
+        frame = self.pipe.wait_for_frames()
+        color_frame = frame.get_color_frame()
+        img = np.asanyarray(color_frame.get_data())
+        self.HEIGHT, self.WIDTH, _ = img.shape
+
+        # Align object - aligning depth to color
+        self.align_to = rs.stream.color
+        self.align = rs.align(self.align_to)
 
     def broadcast_camera_frame(self):
         # Create a TransformStamped message
