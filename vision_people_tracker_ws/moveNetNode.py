@@ -14,7 +14,6 @@ from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
-# from sklearn.decomposition import PCA
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -38,6 +37,19 @@ class VisionLegTracker(Node):
         self.prevAct = time.time()
         self.i = 0
         self.warmup_frames = 60
+
+        # Define the camera frame's static transform
+        self.broadcast_camera_frame()
+
+        # Frame width and height
+        frame = self.pipe.wait_for_frames()
+        color_frame = frame.get_color_frame()
+        img = np.asanyarray(color_frame.get_data())
+        self.HEIGHT, self.WIDTH, _ = img.shape
+
+        # Align object - aligning depth to color
+        self.align_to = rs.stream.color
+        self.align = rs.align(self.align_to)
 
         # cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.pipe.start(self.cfg)
@@ -71,8 +83,6 @@ class VisionLegTracker(Node):
         self.offset_y = 37.0
         self.offset_z = 0.0
         self.offset = [self.offset_x, self.offset_y, self.offset_z]
-        # self.real_width = 220.0  # (mm) of the box
-        # self.threshold = 300  # (mm)
         self.intrinsics = None
 
         self.prev_person_pos = [0.0, 0.0, 0.0]
@@ -84,8 +94,6 @@ class VisionLegTracker(Node):
         except:
             print("Can not access the model!")
 
-        self.get_logger().info("Vision Leg Tracker Node has started.")
-
         # Add a publisher for person coordinates
         self.coord_publisher = self.create_publisher(
             PoseArray, "/person_coordinates", 10
@@ -95,20 +103,7 @@ class VisionLegTracker(Node):
         # Define the static transform broadcaster
         self.tf_broadcaster = StaticTransformBroadcaster(self)
 
-        # Define the camera frame's static transform
-        self.broadcast_camera_frame()
-
-        # Frame width and height
-        frame = self.pipe.wait_for_frames()
-        color_frame = frame.get_color_frame()
-        img = np.asanyarray(color_frame.get_data())
-        self.HEIGHT, self.WIDTH, _ = img.shape
-
-        # Align object - aligning depth to color
-        self.align_to = rs.stream.color
-        self.align = rs.align(self.align_to)
-
-        # self.pca = PCA(n_components=2)
+        self.get_logger().info("Vision Leg Tracker Node has started.")
 
     def broadcast_camera_frame(self):
         # Create a TransformStamped message
@@ -131,6 +126,50 @@ class VisionLegTracker(Node):
         # Broadcast the static transform
         self.tf_broadcaster.sendTransform(t)
         self.get_logger().info("Camera frame transform broadcasted.")
+
+    def publish_human_marker(self, marker_array, id, x, y):
+        # Create a marker for the sphere (human's head)
+        sphere_marker = Marker()
+        sphere_marker.header.frame_id = "camera_frame"
+        sphere_marker.header.stamp = self.get_clock().now().to_msg()
+        sphere_marker.ns = "humans"
+        sphere_marker.id = id * 2
+        sphere_marker.type = Marker.SPHERE
+        sphere_marker.action = Marker.ADD
+        sphere_marker.pose.position.x = x
+        sphere_marker.pose.position.y = -y
+        sphere_marker.pose.position.z = 0.4 # Sphere above the cylinder
+        sphere_marker.scale.x = 0.15
+        sphere_marker.scale.y = 0.15
+        sphere_marker.scale.z = 0.15
+        sphere_marker.color.a = 1.0  # Alpha (transparency)
+        sphere_marker.color.r = 0.0
+        sphere_marker.color.g = 1.0
+        sphere_marker.color.b = 0.0  # Green color
+
+        # Create a marker for the cylinder (human's body)
+        cylinder_marker = Marker()
+        cylinder_marker.header.frame_id = "camera_frame"
+        cylinder_marker.header.stamp = self.get_clock().now().to_msg()
+        cylinder_marker.ns = "humans"
+        cylinder_marker.id = id * 2 + 1
+        cylinder_marker.type = Marker.CYLINDER
+        cylinder_marker.action = Marker.ADD
+        cylinder_marker.pose.position.x = x
+        cylinder_marker.pose.position.y = -y
+        cylinder_marker.pose.position.z = 0.2  # Cylinder's center
+        cylinder_marker.scale.x = 0.1  # Diameter
+        cylinder_marker.scale.y = 0.1  # Diameter
+        cylinder_marker.scale.z = 0.4  # Height of the cylinder
+        cylinder_marker.color.a = 1.0  # Alpha (transparency)
+        cylinder_marker.color.r = 0.0
+        cylinder_marker.color.g = 0.5
+        cylinder_marker.color.b = 1.0  # Blue color
+
+        marker_array.markers.append(sphere_marker)
+        marker_array.markers.append(cylinder_marker)
+
+        return marker_array
 
     def draw(self, frame, keypoints, bbox):
         if bbox[4] > self.bbox_threshold:
@@ -177,9 +216,6 @@ class VisionLegTracker(Node):
         resized_image, _ = self.keep_aspect_ratio_resizer(img, self.input_size)
         image_tensor = tf.cast(resized_image, dtype=tf.uint8)
 
-        # Make predictions
-        currenttime = time.time()
-
         input_details = self.interpreter.get_input_details()
         output_details = self.interpreter.get_output_details()
 
@@ -198,10 +234,6 @@ class VisionLegTracker(Node):
         self.interpreter.invoke()
 
         keypoints_with_scores = self.interpreter.get_tensor(output_details[0]["index"])
-
-        runtime = currenttime - self.prevtime
-        # print("Runtime: ", runtime)
-        self.prevtime = currenttime
 
         return keypoints_with_scores
 
@@ -266,25 +298,63 @@ class VisionLegTracker(Node):
             plane_point (numpy.ndarray): A (3,) vector representing a point on the plane (centroid).
         """
 
-        # if len(points) > 0:
-        #     return [], []
-        # Compute the centroid (mean) of the points
-        centroid = np.mean(points, axis=0)
-        
-        # Center the points by subtracting the centroid
-        centered_points = points - centroid
-        
-        # Compute the covariance matrix
-        covariance_matrix = np.cov(centered_points, rowvar=False)
-        
-        # Perform eigen decomposition
-        eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
-        
-        # The normal vector to the plane is the eigenvector associated with the smallest eigenvalue
-        normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
+        try:
+            # Compute the centroid (mean) of the points
+            centroid = np.mean(points, axis=0)
+            
+            # Center the points by subtracting the centroid
+            centered_points = points - centroid
+            
+            # Compute the covariance matrix
+            covariance_matrix = np.cov(centered_points, rowvar=False)
+            
+            # Perform eigen decomposition
+            eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+            
+            # The normal vector to the plane is the eigenvector associated with the smallest eigenvalue
+            normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
+        except:
+            normal_vector = [0,0,0]
+            centroid = [0,0,0]
         
         return normal_vector, centroid
 
+
+    def facing_direction(self, normal_vector, centroid):
+        A,B,C = normal_vector
+        D = np.dot(normal_vector, centroid)
+
+        # Plane equation
+        print(f"Plane equation: {A:.4f}x + {B:.4f}y + {C:.4f}z + {D:.4f} = 0")
+
+        normal_perpendicular = np.array([1,0,0])
+
+        # print("NORMAL VECTOR:", normal )
+
+        dot_product = np.dot(normal_vector, normal_perpendicular)
+
+        # Calculate the magnitudes of the normal vectors
+        magnitude_estimated = np.linalg.norm(normal_vector)
+        magnitude_perpendicular = np.linalg.norm(normal_perpendicular)
+
+        # Calculate the cosine of the angle
+        cos_angle = dot_product / (magnitude_estimated * magnitude_perpendicular)
+
+        # Calculate the angle in radians
+        theta = np.arccos(cos_angle)
+
+        # Convert the angle to degrees
+        angle_degrees = np.degrees(theta)
+
+        theta = np.radians(angle_degrees)
+
+        if B < 0:
+            theta = theta
+        else:
+            theta = -theta
+
+        return theta
+        
     def processImage(self):
         frame = self.pipe.wait_for_frames()
 
@@ -318,15 +388,8 @@ class VisionLegTracker(Node):
             bbox = keypoints_with_scores[0][i][51:57]
             keypoints_draw = keypoints_with_scores[0][i][:51]
 
-            # keypoints_draw[15] = keypoints_draw[15] + 40.0 / self.WIDTH
-            # keypoints_draw[16] = keypoints_draw[16] - 25.0 / self.HEIGHT
-
-            # keypoints_draw[18] = keypoints_draw[18] + 40.0 / self.WIDTH
-            # keypoints_draw[19] = keypoints_draw[19] + 25.0 / self.HEIGHT
             right_shoulder = tuple([int(keypoints_draw[16]*self.WIDTH), int(keypoints_draw[15]*self.HEIGHT)])
             left_shoulder = tuple([int(keypoints_draw[19]*self.WIDTH), int(keypoints_draw[18]*self.HEIGHT)])
-
-            print(left_shoulder, right_shoulder)
 
             # Rendering
             self.draw(depth_visual, keypoints_draw, bbox)
@@ -337,93 +400,39 @@ class VisionLegTracker(Node):
             )
 
             if bbox[4] > self.bbox_threshold:
+                print(left_shoulder, right_shoulder)
                 cv2.rectangle(img, left_shoulder, right_shoulder, (0, 255, 0), 2)  # Fill with blue
 
                 normal, centroid = self.estimate_plane_pca(keypoints)
 
-                # if normal == []:
-                #     continue
+                theta = self.facing_direction(normal, centroid)
 
-                A,B,C = normal
-                D = np.dot(normal, centroid)
-
-                normal_perpendicular = np.array([1,0,0])
-
-                # print("NORMAL VECTOR:", normal )
-
-                dot_product = np.dot(normal, normal_perpendicular)
-
-                # Calculate the magnitudes of the normal vectors
-                magnitude_estimated = np.linalg.norm(normal)
-                magnitude_perpendicular = np.linalg.norm(normal_perpendicular)
-
-                # Calculate the cosine of the angle
-                cos_angle = dot_product / (magnitude_estimated * magnitude_perpendicular)
-
-                # Calculate the angle in radians
-                theta = np.arccos(cos_angle)
-
-                # Convert the angle to degrees
-                angle_degrees = np.degrees(theta)
-
-                theta = np.radians(angle_degrees)
-
-                if B < 0:
-                    theta = theta
-                else:
-                    theta = -theta
-
-                # Plane equation
-                print(f"Plane equation: {A:.4f}x + {B:.4f}y + {C:.4f}z + {D:.4f} = 0")
+                if left_shoulder[0] - right_shoulder[0] > 0:
+                    theta = theta + 3.14
 
                 x = float(centroid[0])
                 y = float(centroid[2])
 
                 self.prev_person_pos = [x, y, theta]
 
-                world_coords = [x, y, theta]
-                if world_coords:
-                    person_world_coords.append(world_coords)
-                    # Add to PoseArray
-                    pose = Pose()
-                    pose.position.x = world_coords[0]
-                    pose.position.y = -world_coords[1]
-                    # pose.position.z = world_coords[2]/100
-                    q = quaternion_from_euler(0, 0, theta-3.14)
-                    pose.orientation.x = q[0]
-                    pose.orientation.y = q[1]
-                    pose.orientation.z = q[2]
-                    pose.orientation.w = q[3]
+                person_world_coords.append([x,y,theta])
+                # Add to PoseArray
+                pose = Pose()
+                pose.position.x = x
+                pose.position.y = -y
+                pose.position.z = 0.03
+                q = quaternion_from_euler(0, 0, theta-3.14)
+                pose.orientation.x = q[0]
+                pose.orientation.y = q[1]
+                pose.orientation.z = q[2]
+                pose.orientation.w = q[3]
 
-                    # pose.orientation.z = theta
-                    poses.poses.append(pose)
+                # pose.orientation.z = theta
+                poses.poses.append(pose)
 
-                    # Create a marker for the human
-                    marker = Marker()
-                    marker.header.frame_id = "camera_frame"
-                    marker.header.stamp = self.get_clock().now().to_msg()
-                    marker.ns = "humans"
-                    marker.id = i
-                    marker.type = Marker.SPHERE
-                    marker.action = Marker.ADD
-                    marker.pose.position.x = world_coords[0]
-                    marker.pose.position.y = -world_coords[1]
-                    # marker.pose.position.z = float(centroid[2])
-                    # marker.pose.orientation.x = 0.0
-                    # marker.pose.orientation.y = 0.0
-                    # marker.pose.orientation.z = 0.0
-                    # marker.pose.orientation.w = 1.0
-                    marker.scale.x = 0.25
-                    marker.scale.y = 0.25
-                    marker.scale.z = 0.25
-                    marker.color.a = 1.0  # Alpha (transparency)
-                    marker.color.r = 0.0
-                    marker.color.g = 1.0
-                    marker.color.b = 0.0  # Red color
+                marker_array = self.publish_human_marker(marker_array, i, x, y)
 
-                    marker_array.markers.append(marker)
-
-                    self.get_logger().info(f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)")
+                self.get_logger().info(f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)")
                     
         # Publish the PoseArray if there are valid coordinates
         if poses.poses:
@@ -451,6 +460,7 @@ class VisionLegTracker(Node):
             sumfps = 0
 
         cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
+
         # Stack both images horizontally
         images = np.hstack((img, depth_visual))
 
