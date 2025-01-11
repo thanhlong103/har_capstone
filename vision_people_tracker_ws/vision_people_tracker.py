@@ -14,7 +14,9 @@ from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
+
 # from sklearn.decomposition import PCA
+
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -57,12 +59,24 @@ class VisionLegTracker(Node):
         self.bbox_threshold = 0.15
 
         self.EDGES = {
-            (0, 1): "m", (0, 2): "c", (1, 3): "m",
-            (2, 4): "c", (0, 5): "m", (0, 6): "c",
-            (5, 7): "m", (7, 9): "m", (6, 8): "c",
-            (8, 10): "c", (5, 6): "y", (5, 11): "m",
-            (6, 12): "c", (11, 12): "y", (11, 13): "m",
-            (13, 15): "m", (12, 14): "c", (14, 16): "c",
+            (0, 1): "m",
+            (0, 2): "c",
+            (1, 3): "m",
+            (2, 4): "c",
+            (0, 5): "m",
+            (0, 6): "c",
+            (5, 7): "m",
+            (7, 9): "m",
+            (6, 8): "c",
+            (8, 10): "c",
+            (5, 6): "y",
+            (5, 11): "m",
+            (6, 12): "c",
+            (11, 12): "y",
+            (11, 13): "m",
+            (13, 15): "m",
+            (12, 14): "c",
+            (14, 16): "c",
         }
 
         self.input_size = 128
@@ -77,6 +91,7 @@ class VisionLegTracker(Node):
 
         try:
             self.interpreter = tf.lite.Interpreter(model_path="1.tflite")
+            # self.interpreter = tf.lite.Interpreter(model_path="1.tflite")
             self.interpreter.allocate_tensors()
             self.get_logger().info("MoveNet loaded!")
         except:
@@ -86,7 +101,7 @@ class VisionLegTracker(Node):
 
         # Add a publisher for person coordinates
         self.coord_publisher = self.create_publisher(
-            PoseArray, "/person_coordinates", 10
+            PoseArray, "/people_vision_pos", 10
         )
         self.marker_publisher = self.create_publisher(MarkerArray, "/human_markers", 10)
 
@@ -139,7 +154,7 @@ class VisionLegTracker(Node):
         sphere_marker.action = Marker.ADD
         sphere_marker.pose.position.x = x
         sphere_marker.pose.position.y = -y
-        sphere_marker.pose.position.z = 0.4 # Sphere above the cylinder
+        sphere_marker.pose.position.z = 0.4  # Sphere above the cylinder
         sphere_marker.scale.x = 0.15
         sphere_marker.scale.y = 0.15
         sphere_marker.scale.z = 0.15
@@ -190,7 +205,13 @@ class VisionLegTracker(Node):
 
             # Draw the keypoint if confidence is above the threshold
             if kp_conf >= self.confidence_threshold:
-                cv2.circle(frame, (int(kx * self.WIDTH), int(ky * self.HEIGHT)), 7, (0, 255, 0), -1)
+                cv2.circle(
+                    frame,
+                    (int(kx * self.WIDTH), int(ky * self.HEIGHT)),
+                    7,
+                    (0, 255, 0),
+                    -1,
+                )
 
         for edge, _ in self.EDGES.items():
             p1, p2 = edge
@@ -249,8 +270,8 @@ class VisionLegTracker(Node):
         return (image, (target_height, target_width))
 
     def process_keypoints(self, intrinsics, keypoints, depth_array, depth_frame):
-        nice_keypoints=[]
-        
+        nice_keypoints = []
+
         for i in range(0, len(keypoints), 3):
             y, x, confidence = keypoints[i], keypoints[i + 1], keypoints[i + 2]
             if confidence > self.confidence_threshold:
@@ -261,19 +282,41 @@ class VisionLegTracker(Node):
                 # Validate indices to avoid IndexError
                 row = int(keypoints[i])
                 col = int(keypoints[i + 1])
+
+                patch_size = 5
+                half_size = patch_size // 2
+                positions = [(row, col)]
+
+                for j in range(row - half_size, row + half_size + 1):
+                    for k in range(col - half_size, col + half_size + 1):
+                        positions.append((j, k))
+
                 if 0 <= row < depth_array.shape[1] and 0 <= col < depth_array.shape[0]:
                     try:
-                        depth = depth_frame.get_distance(row, col)  # Access depth value
+                        depth_list = []
+                        for x in range(len(positions)):
+                            # print(positions[x][0])
+                            current_depth = depth_frame.get_distance(
+                                positions[x][0], positions[x][1]
+                            )  # Access depth value
+                            depth_list.append(current_depth)
+
+                        depth = np.min(depth_list)
                         coordinate_camera = rs.rs2_deproject_pixel_to_point(
                             intrinsics, [keypoints[i], keypoints[i + 1]], depth
                         )
-                        # Remapping from camera to world
-                        keypoints[i] = coordinate_camera[0]
-                        keypoints[i + 1] = coordinate_camera[1]
-                        keypoints[i + 2] = coordinate_camera[2]
+                        if (coordinate_camera[2] < 3) | (coordinate_camera[2] > 0.2):
+                            # Remapping from camera to world
+                            keypoints[i] = coordinate_camera[0]
+                            keypoints[i + 1] = coordinate_camera[1]
+                            keypoints[i + 2] = coordinate_camera[2]
 
-                        xyz_keypoint = [keypoints[i+2],keypoints[i],keypoints[i + 1]]
-                        nice_keypoints.append(xyz_keypoint)
+                            xyz_keypoint = [
+                                keypoints[i + 2],
+                                keypoints[i],
+                                keypoints[i + 1],
+                            ]
+                            nice_keypoints.append(xyz_keypoint)
                     except:
                         # Set default values or handle the out-of-bounds case
                         keypoints[i] = 0
@@ -286,49 +329,49 @@ class VisionLegTracker(Node):
                     keypoints[i + 2] = 0
 
         return nice_keypoints
-    
+
     def estimate_plane_pca(self, points):
         """
         Estimates a plane from a given set of 3D points using PCA.
-        
+
         Parameters:
             points (numpy.ndarray): A (N, 3) array of 3D points.
-            
+
         Returns:
             plane_normal (numpy.ndarray): A (3,) vector representing the plane's normal.
             plane_point (numpy.ndarray): A (3,) vector representing a point on the plane (centroid).
         """
+        # points = gaussian_filter(points, sigma=1)
 
         try:
             # Compute the centroid (mean) of the points
             centroid = np.mean(points, axis=0)
-            
+
             # Center the points by subtracting the centroid
             centered_points = points - centroid
-            
+
             # Compute the covariance matrix
-            covariance_matrix = np.cov(centered_points, rowvar=False)
-            
+            covariance_matrix = np.cov(centered_points.T)
+
             # Perform eigen decomposition
             eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
-            
+
             # The normal vector to the plane is the eigenvector associated with the smallest eigenvalue
             normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
         except:
-            normal_vector = [0,0,0]
-            centroid = [0,0,0]
-        
+            normal_vector = [0, 0, 0]
+            centroid = [0, 0, 0]
+
         return normal_vector, centroid
 
-
     def facing_direction(self, normal_vector, centroid):
-        A,B,C = normal_vector
+        A, B, C = normal_vector
         D = np.dot(normal_vector, centroid)
 
         # Plane equation
         print(f"Plane equation: {A:.4f}x + {B:.4f}y + {C:.4f}z + {D:.4f} = 0")
 
-        normal_perpendicular = np.array([1,0,0])
+        normal_perpendicular = np.array([1, 0, 0])
 
         # print("NORMAL VECTOR:", normal )
 
@@ -352,10 +395,10 @@ class VisionLegTracker(Node):
         if B < 0:
             theta = theta
         else:
-            theta = -theta
+            theta = 6.28 - theta
 
         return theta
-        
+
     def processImage(self):
         frame = self.pipe.wait_for_frames()
 
@@ -367,6 +410,8 @@ class VisionLegTracker(Node):
 
         img = np.asanyarray(color_frame.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
+
+        img = cv2.medianBlur(img, 5)
 
         # Convert depth image to 3-channel grayscale for visualization
         depth_visual = cv2.normalize(
@@ -383,14 +428,38 @@ class VisionLegTracker(Node):
         # Localization to get the world coordinates
         person_world_coords = []
         poses = PoseArray()
-        marker_array = MarkerArray() 
+        marker_array = MarkerArray()
 
         for i in range(6):
             bbox = keypoints_with_scores[0][i][51:57]
             keypoints_draw = keypoints_with_scores[0][i][:51]
 
-            right_shoulder = tuple([int(keypoints_draw[16]*self.WIDTH), int(keypoints_draw[15]*self.HEIGHT)])
-            left_shoulder = tuple([int(keypoints_draw[19]*self.WIDTH), int(keypoints_draw[18]*self.HEIGHT)])
+            # if (keypoints_draw[17] > self.confidence_threshold):
+            right_shoulder = tuple(
+                [
+                    int(keypoints_draw[16] * self.WIDTH),
+                    int(keypoints_draw[15] * self.HEIGHT),
+                ]
+            )
+            # else:
+            #     right_shoulder = (20,0)
+            # if (keypoints_draw[20] > self.confidence_threshold):
+            left_shoulder = tuple(
+                [
+                    int(keypoints_draw[19] * self.WIDTH),
+                    int(keypoints_draw[18] * self.HEIGHT),
+                ]
+            )
+            # else:
+            #     left_shoulder = (0,0)
+            # if (keypoints_draw[35] > self.confidence_threshold):
+            #     right_hip = tuple([int(keypoints_draw[34]*self.WIDTH), int(keypoints_draw[33]*self.HEIGHT)])
+            # else:
+            #     right_hip = (20,20)
+            # if (keypoints_draw[38] > self.confidence_threshold):
+            #     left_hip = tuple([int(keypoints_draw[37]*self.WIDTH), int(keypoints_draw[36]*self.HEIGHT)])
+            # else:
+            #     left_hip = (0,20)
 
             # Rendering
             self.draw(depth_visual, keypoints_draw, bbox)
@@ -400,15 +469,21 @@ class VisionLegTracker(Node):
                 self.intrinsics, keypoints_draw, depth_image, depth_frame
             )
 
+            # print(keypoints)
+
             if bbox[4] > self.bbox_threshold:
                 print(left_shoulder, right_shoulder)
-                cv2.rectangle(img, left_shoulder, right_shoulder, (0, 255, 0), 2)  # Fill with blue
+                cv2.rectangle(
+                    img, left_shoulder, right_shoulder, (0, 255, 0), 2
+                )  # Fill with blue
 
                 normal, centroid = self.estimate_plane_pca(keypoints)
 
                 theta = self.facing_direction(normal, centroid)
 
-                if left_shoulder[0] - right_shoulder[0] > 0:
+                print(theta)
+
+                if left_shoulder[0] - right_shoulder[0] > 20:
                     theta = theta + 3.14
 
                 x = float(centroid[0])
@@ -416,13 +491,13 @@ class VisionLegTracker(Node):
 
                 self.prev_person_pos = [x, y, theta]
 
-                person_world_coords.append([x,y,theta])
+                person_world_coords.append([x, y, theta])
                 # Add to PoseArray
                 pose = Pose()
                 pose.position.x = x
                 pose.position.y = -y
                 pose.position.z = 0.03
-                q = quaternion_from_euler(0, 0, theta-3.14)
+                q = quaternion_from_euler(0, 0, theta + 3.14)
                 pose.orientation.x = q[0]
                 pose.orientation.y = q[1]
                 pose.orientation.z = q[2]
@@ -433,8 +508,10 @@ class VisionLegTracker(Node):
 
                 marker_array = self.publish_human_marker(marker_array, i, x, y)
 
-                self.get_logger().info(f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)")
-                    
+                self.get_logger().info(
+                    f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)"
+                )
+
         # Publish the PoseArray if there are valid coordinates
         if poses.poses:
             poses.header.frame_id = "camera_frame"  # Replace with your camera frame
@@ -466,8 +543,6 @@ class VisionLegTracker(Node):
         images = np.hstack((img, depth_visual))
 
         cv2.imshow("People Detected", images)
-        # cv2.imshow("depth", depth_image)
-        # cv2.imshow("depth", depth_visual)
 
         if cv2.waitKey(1) == ord("q"):
             self.pipe.stop()
