@@ -1,12 +1,20 @@
+lidar_leg_tracker_ws/build/
+
 lidar_leg_tracker_ws/install/
 
 lidar_leg_tracker_ws/log/
+
+lidar_ws/build/
 
 lidar_ws/install/
 
 lidar_ws/log/
 
-turtlebot3_ws/
+turtlebot3_ws/build
+
+turtlebot3_ws/log
+
+turtlebot3_ws/install
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
