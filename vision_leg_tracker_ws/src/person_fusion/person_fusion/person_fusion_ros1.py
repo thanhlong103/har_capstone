@@ -23,21 +23,6 @@ from pykalman import KalmanFilter
 tip2leg = 195.0
 scan_frequency = 10
 
-# fields1 = ['time', 'x_fused', 'y_fused']
-# filename1 = "/home/ndphu/bagfiles/fused.csv"
-# f1 = open(filename1, 'w')
-# writer1 = csv.DictWriter(f, fieldnames=fields1)
-
-# fields2 = ['time','x_vis', 'y_vis']
-# filename2 = "/home/ndphu/bagfiles/vis.csv"
-# f2 = open(filename2, 'w')
-# writer2 = csv.DictWriter(f, fieldnames=fields2)
-
-# fields3 = ['time','x_lid', 'y_lid']
-# filename3 = "/home/ndphu/bagfiles/lid.csv"
-# f3 = open(filename3, 'w')
-# writer3 = csv.DictWriter(f, fieldnames=fields3)
-
 class PersonFusion:
     """ Single tracked person fusion between lidar and vision"""
     def __init__(self, x, y):
