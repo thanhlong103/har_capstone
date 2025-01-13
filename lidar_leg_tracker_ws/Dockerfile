@@ -3,13 +3,13 @@ WORKDIR /home
 
 
 # Install ROS 2 packages
-#RUN apt-get update && apt-get install -y ros-foxy-ros-base python3-argcomplete
+RUN apt-get update && apt-get install -y ros-foxy-ros-base python3-argcomplete
 
-#RUN apt-get update && apt-get install -y python3-rosdep2 python3-tk
+RUN apt-get update && apt-get install -y python3-rosdep2 python3-tk
 
-#RUN apt-get install -y ros-foxy-turtlebot3-description ros-foxy-gazebo-ros-pkgs
+# RUN apt-get install -y ros-foxy-turtlebot3-description ros-foxy-gazebo-ros-pkgs
 
-#RUN apt-get update && apt-get install -y ros-dev-tools
+RUN apt-get update && apt-get install -y ros-dev-tools
 
 # --- OPEN CV 3.4.12 INSTALLATION ---
 
@@ -55,10 +55,9 @@ RUN mkdir build && cd build && \
 WORKDIR /home
 RUN apt-get install -y nano tmux
 
-#RUN apt-get update && apt-get install -y \
-#    ros-foxy-rviz2 \
-#    libogre-1.12-dev \
-#    python3-pykdl   
+RUN apt-get update && apt-get install -y \
+    libogre-1.12-dev \
+    python3-pykdl   
 
 #RUN apt-get install -y libopenblas-base libopenmpi-dev libomp-dev #??
 #RUN apt-get install -y qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools #??
@@ -76,9 +75,9 @@ RUN apt-get install -y python-numpy
 # Set up ~/.bashrc file
 
 RUN echo "source /opt/ros/foxy/setup.bash" >> ~/.bashrc
-RUN echo "source /home/ros2_ws/install/setup.bash" >> ~/.bashrc
+RUN echo "source ~/ros2_ws/install/setup.bash" >> ~/.bashrc
 RUN echo "export ROS_DOMAIN_ID=9" >> ~/.bashrc
 RUN source ~/.bashrc
 
-WORKDIR /home/ros2_ws
+WORKDIR ~/ros2_ws
 CMD ["bash"]
