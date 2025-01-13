@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'person_fusion'
+package_name = 'fusing_people'
 
 setup(
     name=package_name,
@@ -13,14 +13,14 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='turtlebot',
-    maintainer_email='turtlebot@todo.todo',
+    maintainer='ntlong',
+    maintainer_email='long.nguyen.210085@student.fulbright.edu.vn',
     description='TODO: Package description',
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'person_fusion = person_fusion.person_fusion:main'
+            "fusing_people=fusing_people.fused_people_tracker:main",
         ],
     },
 )

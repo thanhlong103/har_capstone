@@ -1,3 +1,9 @@
+fused_people_ws/build/
+
+fused_people_ws/install/
+
+fused_people_ws/log/
+
 lidar_leg_tracker_ws/build/
 
 lidar_leg_tracker_ws/install/
