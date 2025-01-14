@@ -30,7 +30,9 @@ class PersonFusion(Node):
         self.create_subscription(
             PersonArray, "/people_tracked", self.laser_callback, 10
         )
-        self.people_fused_pub = self.create_publisher(FusedPersonArray, "people_fused", 10)
+        self.people_fused_pub = self.create_publisher(
+            FusedPersonArray, "people_fused", 10
+        )
 
         self.dist_travelled = 0.0
 
@@ -51,6 +53,10 @@ class PersonFusion(Node):
         self.pos_y = 0
         self.vel_x = 0
         self.vel_y = 0
+        self.orientation_x = 0
+        self.orientation_y = 0
+        self.orientation_z = 0
+        self.orientation_w = 0
 
         self.pos_x_laser = 0
         self.pos_y_laser = 0
@@ -119,8 +125,21 @@ class PersonFusion(Node):
         for pose in people.poses:
             pos_x = pose.position.x
             pos_y = pose.position.y
+            orientation_x = pose.orientation.x
+            orientation_y = pose.orientation.y
+            orientation_z = pose.orientation.z
+            orientation_w = pose.orientation.w
             # print(pos_x, pos_y)
-            self.vision_people_array.append([pos_x, pos_y])
+            self.vision_people_array.append(
+                [
+                    pos_x,
+                    pos_y,
+                    orientation_x,
+                    orientation_y,
+                    orientation_z,
+                    orientation_w,
+                ]
+            )
             self.run()
 
     def vision_update(self, pos_x, pos_y):
@@ -154,52 +173,120 @@ class PersonFusion(Node):
         self.update(observations, [])  # Empty list for default covariance
         # self.get_logger().info(f"Update with laser information before: {pos_x}, {pos_y} after: {self.pos_x}, {self.pos_y}")
 
-    def talker(self):
+    def get_publish_person(self):
         """Publish fused person data"""
+        pubPerson = FusedPerson()
+        pubPerson.position.position.x = self.pos_x
+        pubPerson.position.position.y = self.pos_y
+        pubPerson.position.position.z = 0.0
+        pubPerson.position.orientation.x = self.orientation_x
+        pubPerson.position.orientation.y = self.orientation_y
+        pubPerson.position.orientation.z = self.orientation_z
+        pubPerson.position.orientation.w = self.orientation_w
+        pubPerson.velocity.x = self.vel_x
+        pubPerson.velocity.y = self.vel_y
+        pubPerson.velocity.z = 0.0
+
+        return pubPerson
+
+    def get_pos_pair(self, vision_people_array, lidar_people_array, threshold):
+        matched_pairs = []
+
+        # Create a list to track used indices
+        vision_used = [False] * len(vision_people_array)
+        lidar_used = [False] * len(lidar_people_array)
+
+        for i, vision_person in enumerate(vision_people_array):
+            for j, lidar_person in enumerate(lidar_people_array):
+                # Check if detected persons from two data streams are aligned
+                dis = (
+                    (vision_person[0] - lidar_person[0]) ** 2
+                    + (vision_person[1] - lidar_person[1]) ** 2
+                ) ** 0.5
+
+                if dis < threshold:
+                    matched_pairs.append(
+                        [
+                            [
+                                vision_person[0],
+                                vision_person[1],
+                                vision_person[2],
+                                vision_person[3],
+                                vision_person[4],
+                                vision_person[5]
+                            ],
+                            [lidar_person[0], lidar_person[1]],
+                        ]
+                    )
+                    vision_used[i] = True
+                    lidar_used[j] = True
+
+        # Add unmatched vision detections with (0, 0) for lidar
+        for i, used in enumerate(vision_used):
+            if not used:
+                matched_pairs.append(
+                    [
+                        [
+                            vision_people_array[i][0],
+                            vision_people_array[i][1],
+                            vision_people_array[i][2],
+                            vision_people_array[i][3],
+                            vision_people_array[i][4],
+                            vision_people_array[i][5],
+                        ],
+                        [0, 0],
+                    ]
+                )
+
+        # Add unmatched lidar detections with (0, 0) for vision
+        for j, used in enumerate(lidar_used):
+            if not used:
+                matched_pairs.append(
+                    [[0, 0, 0, 0, 0, 0], [lidar_people_array[j][0], lidar_people_array[j][1]]]
+                )
+
+        return matched_pairs
+
+    def run(self):
+        vision_lidar_pairs = self.get_pos_pair(
+            self.vision_people_array,
+            self.lidar_people_array,
+            distance_sources_threshold,
+        )
+
         pubPersonArray = FusedPersonArray()
         pubPersonArray.header = std_msgs.msg.Header()
         pubPersonArray.header.stamp = self.get_clock().now().to_msg()
         pubPersonArray.header.frame_id = "base_laser"
         pubPersonArray.people = []
 
-        pubPerson = FusedPerson()
-        pubPerson.position.x = self.pos_x
-        pubPerson.position.y = self.pos_y
-        pubPerson.position.z = 0.0
-        pubPerson.velocity.x = self.vel_x
-        pubPerson.velocity.y = self.vel_y
-        pubPerson.velocity.z = 0.0
+        people_count = 0
 
-        pubPersonArray.people.append(pubPerson)
-        print("Publish 1 fused person location", pubPerson)
+        for pair in vision_lidar_pairs:
+            vision_position, lidar_position = pair
+            
+            self.orientation_x = vision_position[2]
+            self.orientation_y = vision_position[3]
+            self.orientation_z = vision_position[4]
+            self.orientation_w = vision_position[5]
+
+            if lidar_position == [0, 0]:
+                self.vision_update(vision_position[0], vision_position[1])
+                self.vel_x = 0.0
+                self.vel_y = 0.0
+            elif vision_position == [0, 0]:
+                self.laser_update(lidar_position[0], lidar_position[1])
+            else:
+                self.vision_update(vision_position[0], vision_position[1])
+                self.laser_update(lidar_position[0], lidar_position[1])
+
+            pubPerson = self.get_publish_person()
+            pubPersonArray.people.append(pubPerson)
+
+            people_count += 1
 
         self.people_fused_pub.publish(pubPersonArray)
-
-    def get_pos_pair(self, vision_people_array, lidar_people_array, threshold):
-        for vision_person in vision_people_array:
-            for lidar_person in lidar_people_array:
-                """Check if detected persons from two data streams are aligned"""
-                dis = (
-                    (vision_person[0] - lidar_person[0]) ** 2
-                    + (vision_person[1] - lidar_person[1]) ** 2
-                ) ** 0.5
-                if dis < threshold:
-                    return [
-                        [vision_person[0], vision_person[1]],
-                        [lidar_person[0], lidar_person[1]],
-                    ]
-
-    def run(self):
-        vision_lidar_pair = self.get_pos_pair(
-            self.vision_people_array,
-            self.lidar_people_array,
-            distance_sources_threshold,
-        )
-        # print(vision_lidar_pair)
-        if vision_lidar_pair is not None:
-            self.vision_update(vision_lidar_pair[0][0], vision_lidar_pair[0][1])
-            self.laser_update(vision_lidar_pair[1][0], vision_lidar_pair[1][1])
-            self.talker()
+        self.get_logger().info(f"Publish {people_count} fused people location: {pubPersonArray}")
 
 
 def main(args=None):

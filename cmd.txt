@@ -26,15 +26,27 @@ ros2 launch turtlebot3_cartographer cartographer.launch.py
 ros2 run nav2_map_server map_saver_cli -f map_name
 
 *Lidar
-cd /home/ntlong/har_capstone/lidar_ws && source install/setup.bash && ros2 launch ldlidar_stl_ros2 ld19.launch.py
+cd /home/ntlong/har_capstone/lidar_leg_tracker_ws && source install/setup.bash && ros2 launch ldlidar_stl_ros2 ld19.launch.py
 
 *Nav2
 cd /home/ntlong/har_capstone/turtlebot3_ws && source install/setup.bash/ && ros2 launch turtlebot3_navigation2 navigation2.launch.py map:=map_name.yaml
 
-#LAUNCH MONITOR UI
+# LAUNCH MONITOR UI
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 cd /home/ntlong/har_capstone/monitor-ui && npm start
 
-#CAMERA
+# CAMERA
 *Run in tf virtual environment
 source tf/bin/activate
+
+# Leg_Detection Kalman Filter
+
+cd /home/ntlong/har_capstone/lidar_leg_tracker_ws && source install/setup.bash && ros2 launch ldlidar_stl_ros2 ld19.launch.py
+
+docker exec -it leg_detector bash
+ros2 launch leg_detector lidar_leg_tracker.launch.py 
+
+python3 ~/har_capstone/lidar_leg_tracker_ws/src/ros2_leg_detector/src/scripts/publish_marker.py
+python3 ~/har_capstone/fused_people_ws/src/fusing_people/fusing_people/poseArrayPublisher.py 
+
+

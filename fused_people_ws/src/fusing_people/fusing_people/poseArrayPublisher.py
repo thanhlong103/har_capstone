@@ -2,18 +2,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseArray, Pose
 import random
-
-
-def generate_random_pose():
-    pose = Pose()
-    pose.position.x = -1.0
-    pose.position.y = -0.05
-    pose.position.z = 0.0
-    pose.orientation.x = 0.0
-    pose.orientation.y = 0.0
-    pose.orientation.z = 0.0
-    pose.orientation.w = 0.0
-    return pose
+from tf_transformations import quaternion_from_euler
 
 
 class PoseArrayPublisher(Node):
@@ -25,14 +14,48 @@ class PoseArrayPublisher(Node):
         )  # Publish every 0.5 seconds
         self.get_logger().info("PoseArray Publisher Node has started.")
 
-    def publish_pose_array(self):
+    def generate_random_pose(self):
         pose_array = PoseArray()
         pose_array.header.stamp = self.get_clock().now().to_msg()
         pose_array.header.frame_id = "base_laser"  # Adjust frame_id as needed
 
-        # Add random poses to the PoseArray
-        for _ in range(1):  # Publish 5 random poses
-            pose_array.poses.append(generate_random_pose())
+        pose1 = Pose()
+        q = quaternion_from_euler(0, 0, 0)
+        pose1.position.x = 0.0
+        pose1.position.y = 0.0
+        pose1.orientation.x = q[0]
+        pose1.orientation.y = q[1]
+        pose1.orientation.z = q[2]
+        pose1.orientation.w = q[3]
+
+        pose_array.poses.append(pose1)
+
+        pose2 = Pose()
+        q = quaternion_from_euler(0, 0, -3.14/2)
+        pose2.position.x = 1.0
+        pose2.position.y = 1.0
+        pose2.orientation.x = q[0]
+        pose2.orientation.y = q[1]
+        pose2.orientation.z = q[2]
+        pose2.orientation.w = q[3]
+
+        pose_array.poses.append(pose2)
+
+        pose3 = Pose()
+        q = quaternion_from_euler(0, 0, 3.14/2)
+        pose3.position.x = 1.0
+        pose3.position.y = -1.0
+        pose3.orientation.x = q[0]
+        pose3.orientation.y = q[1]
+        pose3.orientation.z = q[2]
+        pose3.orientation.w = q[3]
+
+        pose_array.poses.append(pose3)
+
+        return pose_array
+
+    def publish_pose_array(self):
+        pose_array = self.generate_random_pose()
 
         self.publisher_.publish(pose_array)
         self.get_logger().info(
