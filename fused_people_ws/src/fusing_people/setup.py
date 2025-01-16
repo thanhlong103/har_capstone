@@ -21,6 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             "fusing_people=fusing_people.fused_people_tracker:main",
+            "vision_pose=fusing_people.poseArrayPublisher:main",
+            "fused_group=fusing_people.fused_group:main",
         ],
     },
 )

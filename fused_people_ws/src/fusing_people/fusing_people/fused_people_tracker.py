@@ -140,7 +140,7 @@ class PersonFusion(Node):
                     orientation_w,
                 ]
             )
-            self.run()
+        self.run()
 
     def vision_update(self, pos_x, pos_y):
         """Update filter with vision data"""
@@ -163,7 +163,7 @@ class PersonFusion(Node):
                 pos_y = person.pose.position.y
 
                 self.lidar_people_array.append([pos_x, pos_y])
-                self.run()
+            self.run()
 
     def laser_update(self, pos_x, pos_y):
         """Update filter with lidar data"""
