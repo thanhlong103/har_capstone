@@ -2,10 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>fused_people_msgs</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="abodhe@andrew.cmu.edu">ankur</maintainer>
-  <license>TODO: License declaration</license>
+  <version>0.1.0</version>
+  <description>Custom ROS2 message for People Group Detection</description>
+  <maintainer email="long.nguyen.210085@student.fulbright.edu.vn">ankur</maintainer>
+  <license>None</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 

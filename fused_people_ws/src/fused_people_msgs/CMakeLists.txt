@@ -20,6 +20,8 @@ find_package(std_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/FusedPerson.msg"
   "msg/FusedPersonArray.msg"
+  "msg/PeopleGroup.msg"
+  "msg/PeopleGroupArray.msg"
   DEPENDENCIES geometry_msgs std_msgs
 )
 

@@ -1,7 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from tf_transformations import euler_from_quaternion
-from fused_people_msgs.msg import FusedPersonArray, FusedPerson
+from fused_people_msgs.msg import FusedPersonArray, FusedPerson, PeopleGroupArray, PeopleGroup
+from std_msgs.msg import Header
 
 from shapely.geometry import LineString, Point, Polygon
 import numpy as np
@@ -18,10 +19,13 @@ class FusedPeopleSubscriber(Node):
             10,  # QoS
         )
 
+        # Publisher for PeopleGroupArray
+        self.publisher = self.create_publisher(PeopleGroupArray, "/people_groups", 10)
+
         # Apply DBSCAN clustering
         # eps is the maximum distance between two points to be considered as neighbors
         # min_samples is the minimum number of points to form a cluster
-        self.dbscan = DBSCAN(eps=4, min_samples=2)
+        self.dbscan = DBSCAN(eps=3.0, min_samples=2)
 
         self.pose_array = []
         self.line_length = 10.0
@@ -31,19 +35,18 @@ class FusedPeopleSubscriber(Node):
         self.get_logger().info("Fused People Subscriber Node has started.")
 
     def pose_process(self, pose):
-        # Extract quaternion components
         qx = pose.position.orientation.x
         qy = pose.position.orientation.y
         qz = pose.position.orientation.z
         qw = pose.position.orientation.w
 
         # Convert quaternion to Euler angles (roll, pitch, yaw)
-        roll, pitch, orientation = euler_from_quaternion([qx, qy, qz, qw])
+        _, _, orientation = euler_from_quaternion([qx, qy, qz, qw])
 
         x = pose.position.position.x
         y = pose.position.position.y
 
-        self.pose_array.append([x, y, orientation])
+        return [x, y, orientation]
 
     def create_line(self, point):
         """
@@ -76,75 +79,84 @@ class FusedPeopleSubscriber(Node):
                         intersections.append(intersection)
         return intersections
 
-    def detect_group(self):
-        self.pose_array = np.array(self.pose_array)
-
-        # print(self.pose_array)
-
-        labels = self.dbscan.fit_predict(self.pose_array)
-
-        # Filter out the points labeled as outliers (label = -1)
-        self.pose_array = self.pose_array[labels != -1]
-
-        print(self.pose_array)
-        # Create lines
-        lines = [self.create_line(p) for p in self.pose_array]
-
-        # Find intersections
+    def detect_group(self, cluster):
+        lines = [self.create_line(p) for p in cluster]
         intersection_points = self.find_intersections(lines)
 
-        # Create a polygon from intersection points
-        polygon = None
         if len(intersection_points) == 1:
-            return True
+            distances = [
+                Point(pt[0], pt[1]).distance(intersection_points[0])
+                for pt in cluster
+            ]
+            return np.mean(distances) < self.area_near_threshold
+
         elif len(intersection_points) > 1:
-            # Sort points to form a convex hull
             coords = [(pt.x, pt.y) for pt in intersection_points]
             polygon = Polygon(coords).convex_hull
-
-            # Calculate area if the polygon is valid
             area = polygon.area
 
             if area < self.interest_area:
-                # Calculate the distance from each point to the centroid
-                distances = []
+                centroid = polygon.centroid
+                distances = [
+                    Point(pt[0], pt[1]).distance(centroid)
+                    for pt in cluster
+                ]
+                return np.mean(distances) < self.area_near_threshold
 
-                if area < 0.05:
-                    for pt in self.pose_array:
-                        point = Point(pt[0], pt[1])
-                        distance = intersection_points[0].distance(point)
-                        distances.append(distance)
-                else:
-                    # Calculate the centroid (center) of the polygon
-                    centroid = polygon.centroid
+        return False
 
-                    if centroid:
-                        for pt in self.pose_array:
-                            point = Point(pt[0], pt[1])
-                            distance = centroid.distance(point)
-                            distances.append(distance)
-                if np.mean(distance) < self.area_near_threshold:
-                    return True
-                else:
-                    return False
-            else:
-                return False
-
-        else:
-            return False
+    def create_fused_person(self, person_id, pose):
+        person = FusedPerson()
+        person.id = person_id
+        person.position.position.x = pose[0]
+        person.position.position.y = pose[1]
+        person.velocity.x = 0.0  # Default velocity; update if available
+        person.velocity.y = 0.0
+        return person
 
     def fused_people_callback(self, msg):
-        """
-        Callback function to handle messages from the fused_people topic.
-        """
-        self.pose_array = []
-        for i, pose in enumerate(msg.people):
-            self.pose_process(pose)
+        self.pose_array = [self.pose_process(pose) for pose in msg.people]
+        self.pose_array = np.array(self.pose_array)
 
-        if self.detect_group():
-            print("GROUP!")
-        else:
-            return
+        # DBSCAN clustering
+        labels = self.dbscan.fit_predict(self.pose_array)
+
+        groups = {}
+        for label in set(labels):
+            # if label != -1:  # Ignore outliers
+            groups[label] = self.pose_array[labels == label]
+
+        people_group_array = PeopleGroupArray()
+        people_group_array.header = Header()
+        people_group_array.header.stamp = self.get_clock().now().to_msg()
+        people_group_array.header.frame_id = "base_laser"
+
+        for group_id, cluster in groups.items():
+            people_group = PeopleGroup()
+            if group_id == -1:
+                group_id = 10
+            people_group.id = int(group_id) 
+            people_group.header = Header()
+            people_group.header.stamp = self.get_clock().now().to_msg()
+            people_group.header.frame_id = "base_laser"
+
+            # Add people to the group
+            for i, pose in enumerate(cluster):
+                fused_person = self.create_fused_person(i, pose)
+                people_group.people.append(fused_person)
+
+            # Check if the group is valid
+            if self.detect_group(cluster):
+                self.get_logger().info(f"Group {group_id} detected!")
+            else:
+                self.get_logger().info(f"Group {group_id} is not a valid group.")
+
+            people_group_array.groups.append(people_group)
+
+        # Publish the PeopleGroupArray message
+        self.publisher.publish(people_group_array)
+        self.get_logger().info("Published PeopleGroupArray message.")
+
 
 
 def main(args=None):

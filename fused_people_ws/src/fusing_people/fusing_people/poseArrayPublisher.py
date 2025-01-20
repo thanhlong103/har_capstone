@@ -63,6 +63,28 @@ class PoseArrayPublisher(Node):
 
         pose_array.poses.append(pose4)
 
+        pose5 = Pose()
+        q = quaternion_from_euler(0, 0, 0)
+        pose5.position.x = 4.0
+        pose5.position.y = 0.0
+        pose5.orientation.x = q[0]
+        pose5.orientation.y = q[1]
+        pose5.orientation.z = q[2]
+        pose5.orientation.w = q[3]
+
+        pose_array.poses.append(pose5)
+
+        pose6 = Pose()
+        q = quaternion_from_euler(0, 0, 3.14)
+        pose6.position.x = 5.0
+        pose6.position.y = 0.0
+        pose6.orientation.x = q[0]
+        pose6.orientation.y = q[1]
+        pose6.orientation.z = q[2]
+        pose6.orientation.w = q[3]
+
+        pose_array.poses.append(pose6)
+
         return pose_array
 
     def publish_pose_array(self):
