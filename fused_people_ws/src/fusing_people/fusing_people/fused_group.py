@@ -115,6 +115,13 @@ class FusedPeopleSubscriber(Node):
         return person
 
     def fused_people_callback(self, msg):
+        """
+        Callback to process data from /people_fused and publish grouped data.
+        """
+        if not msg.people:
+            self.get_logger().info("No people detected in the /people_fused topic.")
+            return
+
         self.pose_array = [self.pose_process(pose) for pose in msg.people]
         self.pose_array = np.array(self.pose_array)
 
@@ -133,20 +140,28 @@ class FusedPeopleSubscriber(Node):
 
         for group_id, cluster in groups.items():
             people_group = PeopleGroup()
-            if group_id == -1:
-                group_id = 10
-            people_group.id = int(group_id) 
             people_group.header = Header()
             people_group.header.stamp = self.get_clock().now().to_msg()
             people_group.header.frame_id = "base_laser"
 
-            # Add people to the group
-            for i, pose in enumerate(cluster):
-                fused_person = self.create_fused_person(i, pose)
-                people_group.people.append(fused_person)
-
             # Check if the group is valid
             if self.detect_group(cluster):
+                # Extract members of this group
+                group_indices = np.where(labels == group_id)[0]
+
+                # Populate the group with FusedPerson data
+                for idx in group_indices:
+                    person = msg.people[idx]
+                    fused_person = FusedPerson()
+                    fused_person.id = person.id
+                    fused_person.position = person.position
+                    fused_person.velocity = person.velocity
+                    people_group.people.append(fused_person)
+
+                if group_id == -1:
+                    group_id = 10
+                people_group.id = int(group_id) 
+
                 self.get_logger().info(f"Group {group_id} detected!")
             else:
                 self.get_logger().info(f"Group {group_id} is not a valid group.")
