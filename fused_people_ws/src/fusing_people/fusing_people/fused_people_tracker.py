@@ -48,21 +48,21 @@ class PersonFusion(Node):
         var_obs_local = std_obs**2
         self.var_obs = (std_obs + 0.4) ** 2
 
-        self.filtered_state_means = np.array([0, 0, 0, 0])  # Initialize at origin
-        self.pos_x = 0
-        self.pos_y = 0
-        self.vel_x = 0
-        self.vel_y = 0
-        self.orientation_x = 0
-        self.orientation_y = 0
-        self.orientation_z = 0
-        self.orientation_w = 0
+        self.filtered_state_means = np.array([0.0, 0.0, 0.0, 0.0])  # Initialize at origin
+        self.pos_x = 0.0
+        self.pos_y = 0.0
+        self.vel_x = 0.0
+        self.vel_y = 0.0
+        self.orientation_x = 0.0
+        self.orientation_y = 0.0
+        self.orientation_z = 0.0
+        self.orientation_w = 0.0
 
-        self.pos_x_laser = 0
-        self.pos_y_laser = 0
+        self.pos_x_laser = 0.0
+        self.pos_y_laser = 0.0
 
-        self.pos_x_vision = 0
-        self.pos_y_vision = 0
+        self.pos_x_vision = 0.0
+        self.pos_y_vision = 0.0
 
         self.filtered_state_covariances = 0.5 * np.eye(4)
 
@@ -234,7 +234,7 @@ class PersonFusion(Node):
                             vision_people_array[i][4],
                             vision_people_array[i][5],
                         ],
-                        [0, 0],
+                        [0.0, 0.0],
                     ]
                 )
 
@@ -242,7 +242,7 @@ class PersonFusion(Node):
         for j, used in enumerate(lidar_used):
             if not used:
                 matched_pairs.append(
-                    [[0, 0, 0, 0, 0, 0], [lidar_people_array[j][0], lidar_people_array[j][1]]]
+                    [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [lidar_people_array[j][0], lidar_people_array[j][1]]]
                 )
 
         return matched_pairs
@@ -270,11 +270,11 @@ class PersonFusion(Node):
             self.orientation_z = vision_position[4]
             self.orientation_w = vision_position[5]
 
-            if lidar_position == [0, 0]:
+            if lidar_position == [0.0, 0.0]:
                 self.vision_update(vision_position[0], vision_position[1])
                 self.vel_x = 0.0
                 self.vel_y = 0.0
-            elif vision_position == [0, 0]:
+            elif vision_position == [0.0, 0.0]:
                 self.laser_update(lidar_position[0], lidar_position[1])
             else:
                 self.vision_update(vision_position[0], vision_position[1])

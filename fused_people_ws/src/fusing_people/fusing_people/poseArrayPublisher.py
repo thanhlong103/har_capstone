@@ -20,8 +20,8 @@ class PoseArrayPublisher(Node):
         pose_array.header.frame_id = "base_laser"  # Adjust frame_id as needed
 
         pose1 = Pose()
-        q = quaternion_from_euler(0, 0, 0)
-        pose1.position.x = 0.0
+        q = quaternion_from_euler(0.0, 0.0, 0.0)
+        pose1.position.x = 1.0
         pose1.position.y = 0.0
         pose1.orientation.x = q[0]
         pose1.orientation.y = q[1]
@@ -30,60 +30,60 @@ class PoseArrayPublisher(Node):
 
         pose_array.poses.append(pose1)
 
-        pose2 = Pose()
-        q = quaternion_from_euler(0, 0, -3.14/2)
-        pose2.position.x = 1.0
-        pose2.position.y = 1.0
-        pose2.orientation.x = q[0]
-        pose2.orientation.y = q[1]
-        pose2.orientation.z = q[2]
-        pose2.orientation.w = q[3]
+        # pose2 = Pose()
+        # q = quaternion_from_euler(0, 0, -3.14/2)
+        # pose2.position.x = 1.0
+        # pose2.position.y = 1.0
+        # pose2.orientation.x = q[0]
+        # pose2.orientation.y = q[1]
+        # pose2.orientation.z = q[2]
+        # pose2.orientation.w = q[3]
 
-        pose_array.poses.append(pose2)
+        # pose_array.poses.append(pose2)
 
-        pose3 = Pose()
-        q = quaternion_from_euler(0, 0, 3.14/2)
-        pose3.position.x = 1.0
-        pose3.position.y = -1.0
-        pose3.orientation.x = q[0]
-        pose3.orientation.y = q[1]
-        pose3.orientation.z = q[2]
-        pose3.orientation.w = q[3]
+        # pose3 = Pose()
+        # q = quaternion_from_euler(0, 0, 3.14/2)
+        # pose3.position.x = 1.0
+        # pose3.position.y = -1.0
+        # pose3.orientation.x = q[0]
+        # pose3.orientation.y = q[1]
+        # pose3.orientation.z = q[2]
+        # pose3.orientation.w = q[3]
 
-        pose_array.poses.append(pose3)
+        # pose_array.poses.append(pose3)
 
-        pose4 = Pose()
-        q = quaternion_from_euler(0, 0, 3.14)
-        pose4.position.x = 2.0
-        pose4.position.y = 0.0
-        pose4.orientation.x = q[0]
-        pose4.orientation.y = q[1]
-        pose4.orientation.z = q[2]
-        pose4.orientation.w = q[3]
+        # pose4 = Pose()
+        # q = quaternion_from_euler(0, 0, 3.14)
+        # pose4.position.x = 2.0
+        # pose4.position.y = 0.0
+        # pose4.orientation.x = q[0]
+        # pose4.orientation.y = q[1]
+        # pose4.orientation.z = q[2]
+        # pose4.orientation.w = q[3]
 
-        pose_array.poses.append(pose4)
+        # pose_array.poses.append(pose4)
 
-        pose5 = Pose()
-        q = quaternion_from_euler(0, 0, 0)
-        pose5.position.x = 4.0
-        pose5.position.y = 0.0
-        pose5.orientation.x = q[0]
-        pose5.orientation.y = q[1]
-        pose5.orientation.z = q[2]
-        pose5.orientation.w = q[3]
+        # pose5 = Pose()
+        # q = quaternion_from_euler(0, 0, 0)
+        # pose5.position.x = 4.0
+        # pose5.position.y = 0.0
+        # pose5.orientation.x = q[0]
+        # pose5.orientation.y = q[1]
+        # pose5.orientation.z = q[2]
+        # pose5.orientation.w = q[3]
 
-        pose_array.poses.append(pose5)
+        # pose_array.poses.append(pose5)
 
-        pose6 = Pose()
-        q = quaternion_from_euler(0, 0, 3.14)
-        pose6.position.x = 5.0
-        pose6.position.y = 0.0
-        pose6.orientation.x = q[0]
-        pose6.orientation.y = q[1]
-        pose6.orientation.z = q[2]
-        pose6.orientation.w = q[3]
+        # pose6 = Pose()
+        # q = quaternion_from_euler(0, 0, 3.14)
+        # pose6.position.x = 5.0
+        # pose6.position.y = 0.0
+        # pose6.orientation.x = q[0]
+        # pose6.orientation.y = q[1]
+        # pose6.orientation.z = q[2]
+        # pose6.orientation.w = q[3]
 
-        pose_array.poses.append(pose6)
+        # pose_array.poses.append(pose6)
 
         return pose_array
 
