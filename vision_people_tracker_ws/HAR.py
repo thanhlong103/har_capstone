@@ -8,6 +8,7 @@ from tensorflow.keras.models import load_model
 import math
 import time
 import pandas as pd
+import os
 from tf_transformations import quaternion_from_euler
 from geometry_msgs.msg import PoseArray, Pose
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
@@ -98,7 +99,8 @@ class VisionLegTracker(Node):
             print("Can not access the MoveNet!")
 
         try:
-            self.model = tf.saved_model.load('./mymodel')
+            self.model = tf.saved_model.load("./mymodel")
+            self.infer = self.model.signatures["serving_default"]
         except:
             print("Can not access HAR model")
 
@@ -374,7 +376,7 @@ class VisionLegTracker(Node):
         D = np.dot(normal_vector, centroid)
 
         # Plane equation
-        print(f"Plane equation: {A:.4f}x + {B:.4f}y + {C:.4f}z + {D:.4f} = 0")
+        # print(f"Plane equation: {A:.4f}x + {B:.4f}y + {C:.4f}z + {D:.4f} = 0")
 
         normal_perpendicular = np.array([1, 0, 0])
 
@@ -403,6 +405,54 @@ class VisionLegTracker(Node):
             theta = 6.28 - theta
 
         return theta
+
+    def make_landmark_timestep(self, keypoints_with_scores):
+        c_lm = []  # Start with an empty list
+        keypoints_k = keypoints_with_scores.reshape(-1, 3)
+
+        for i in range(0, 17):
+            c_lm.append(keypoints_k[i])  # Append each keypoint as a list
+
+        c_lm = np.concatenate(c_lm)
+        return c_lm
+
+    def detectAct(self, lm_list):
+        lm_list = np.array(lm_list)
+        lm_list = np.expand_dims(lm_list, axis=0)
+
+        # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable all GPUs
+
+        lm_tensor = tf.constant(lm_list, dtype=tf.float32)  # Ensure dtype is float32
+        results = np.argmax(self.infer(keras_tensor=lm_tensor)["output_0"].numpy())
+
+        # results = np.argmax(infer(tf.constant(lm_list))["output_0"].numpy())
+
+        if results == 0:
+            label = "HANDCLAPPING"
+        elif results == 1:
+            label = "BOXING"
+        elif results == 2:
+            label = "HANDWAVING"
+        elif results == 3:
+            label = "JOGGING"
+        elif results == 4:
+            label = "RUNNING"
+        else:
+            label = "WALKING"
+
+        return label
+
+    def draw_class_on_image(self, label, img, bbox):
+        y, x, _ = img.shape
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        position = (int(bbox[1] * x), int(bbox[0] * y - 10))
+        fontScale = 1
+        fontColor = (0, 255, 0)
+        thickness = 2
+        lineType = 2
+        cv2.putText(
+            img, label, position, font, fontScale, fontColor, thickness, lineType
+        )
 
     def processImage(self):
         frame = self.pipe.wait_for_frames()
@@ -446,25 +496,12 @@ class VisionLegTracker(Node):
                     int(keypoints_draw[15] * self.HEIGHT),
                 ]
             )
-            # else:
-            #     right_shoulder = (20,0)
-            # if (keypoints_draw[20] > self.confidence_threshold):
             left_shoulder = tuple(
                 [
                     int(keypoints_draw[19] * self.WIDTH),
                     int(keypoints_draw[18] * self.HEIGHT),
                 ]
             )
-            # else:
-            #     left_shoulder = (0,0)
-            # if (keypoints_draw[35] > self.confidence_threshold):
-            #     right_hip = tuple([int(keypoints_draw[34]*self.WIDTH), int(keypoints_draw[33]*self.HEIGHT)])
-            # else:
-            #     right_hip = (20,20)
-            # if (keypoints_draw[38] > self.confidence_threshold):
-            #     left_hip = tuple([int(keypoints_draw[37]*self.WIDTH), int(keypoints_draw[36]*self.HEIGHT)])
-            # else:
-            #     left_hip = (0,20)
 
             # Rendering
             self.draw(depth_visual, keypoints_draw, bbox)
@@ -477,7 +514,16 @@ class VisionLegTracker(Node):
             # print(keypoints)
 
             if bbox[4] > self.bbox_threshold:
-                print(left_shoulder, right_shoulder)
+                # print(left_shoulder, right_shoulder)
+
+                c_lm = self.make_landmark_timestep(keypoints_draw)
+                if len(c_lm) > 0:
+                    self.lm_list[i].append(c_lm)
+                if len(self.lm_list[i]) == self.n_time_steps:
+                    label = self.detectAct(self.lm_list[i])
+                    self.draw_class_on_image(label, img, bbox)
+                    self.lm_list[i] = []
+
                 cv2.rectangle(
                     img, left_shoulder, right_shoulder, (0, 255, 0), 2
                 )  # Fill with blue
@@ -486,7 +532,7 @@ class VisionLegTracker(Node):
 
                 theta = self.facing_direction(normal, centroid)
 
-                print(theta)
+                # print(theta)
 
                 if left_shoulder[0] - right_shoulder[0] > 20:
                     theta = theta + 3.14
@@ -538,7 +584,7 @@ class VisionLegTracker(Node):
         fpsAvg = sumfps / len(self.fpsArr)
 
         if len(self.fpsArr) == 10:  # Reset every 10 frames
-            print(f"Avg FPS: {fpsAvg}")
+            # print(f"Avg FPS: {fpsAvg}")
             self.fpsArr = []
             sumfps = 0
 
