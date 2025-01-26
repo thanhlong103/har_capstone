@@ -16,11 +16,10 @@ lidar_ws/install/
 
 lidar_ws/log/
 
-turtlebot3_ws/build
+social_costmap_ws/build/
 
-turtlebot3_ws/log
-
-turtlebot3_ws/install
+social_costmap_ws/install/
+social_costmap_ws/log/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
