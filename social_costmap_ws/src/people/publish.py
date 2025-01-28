@@ -37,8 +37,8 @@ class PeoplePublisherNode(Node):
         # Create a Person message
         person_msg = Person()
         person_msg.name = "John Doe"
-        person_msg.position = Point(x=0.3, y=1.3, z=0.0)  # Example position
-        person_msg.velocity = Point(x=0.05, y=0.05, z=0.0)
+        person_msg.position = Point(x=5.0, y=2.0, z=0.0)  # Example position
+        person_msg.velocity = Point(x=0.15, y=0.15, z=0.0)
         person_msg.reliability = 0.95
         person_msg.tagnames = self.tags  # Add the tags
         
