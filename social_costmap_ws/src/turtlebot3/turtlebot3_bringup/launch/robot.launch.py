@@ -29,54 +29,51 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    TURTLEBOT3_MODEL = os.environ['TURTLEBOT3_MODEL']
-    LDS_MODEL = os.environ['LDS_MODEL']
+    TURTLEBOT3_MODEL = os.environ["TURTLEBOT3_MODEL"]
+    LDS_MODEL = os.environ["LDS_MODEL"]
 
-    usb_port = LaunchConfiguration('usb_port', default='/dev/ttyACM0')
+    usb_port = LaunchConfiguration("usb_port", default="/dev/ttyACM0")
 
     tb3_param_dir = LaunchConfiguration(
-        'tb3_param_dir',
+        "tb3_param_dir",
         default=os.path.join(
-            get_package_share_directory('turtlebot3_bringup'),
-            'param',
-            TURTLEBOT3_MODEL + '.yaml'))
-
-    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
-
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'use_sim_time',
-            default_value=use_sim_time,
-            description='Use simulation (Gazebo) clock if true'),
-
-        DeclareLaunchArgument(
-            'usb_port',
-            default_value=usb_port,
-            description='Connected USB port with OpenCR'),
-
-        DeclareLaunchArgument(
-            'tb3_param_dir',
-            default_value=tb3_param_dir,
-            description='Full path to turtlebot3 parameter file to load'),
-
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                [ThisLaunchFileDir(), '/turtlebot3_state_publisher.launch.py']),
-            launch_arguments={'use_sim_time': use_sim_time}.items(),
+            get_package_share_directory("turtlebot3_bringup"),
+            "param",
+            TURTLEBOT3_MODEL + ".yaml",
         ),
+    )
 
-        Node(
-            package="tf2_ros",
-            executable="static_transform_publisher",
-            name="static_transform_publisher",
-            arguments=["0", "0", "0", "0", "0", "0", "odom", "base_link"],
-            output="screen",
-        ),
+    use_sim_time = LaunchConfiguration("use_sim_time", default="false")
 
-        Node(
-            package='turtlebot3_node',
-            executable='turtlebot3_ros',
-            parameters=[tb3_param_dir],
-            arguments=['-i', usb_port],
-            output='screen'),
-    ])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "use_sim_time",
+                default_value=use_sim_time,
+                description="Use simulation (Gazebo) clock if true",
+            ),
+            DeclareLaunchArgument(
+                "usb_port",
+                default_value=usb_port,
+                description="Connected USB port with OpenCR",
+            ),
+            DeclareLaunchArgument(
+                "tb3_param_dir",
+                default_value=tb3_param_dir,
+                description="Full path to turtlebot3 parameter file to load",
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [ThisLaunchFileDir(), "/turtlebot3_state_publisher.launch.py"]
+                ),
+                launch_arguments={"use_sim_time": use_sim_time}.items(),
+            ),
+            Node(
+                package="turtlebot3_node",
+                executable="turtlebot3_ros",
+                parameters=[tb3_param_dir],
+                arguments=["-i", usb_port],
+                output="screen",
+            ),
+        ]
+    )
