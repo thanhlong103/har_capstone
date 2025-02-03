@@ -134,8 +134,8 @@ class VisionLegTracker(Node):
         t.child_frame_id = "camera_frame"  # Camera frame
 
         # Define translation (position) of the camera
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = -0.3
+        t.transform.translation.x = -0.2
+        t.transform.translation.y = 0.0
         t.transform.translation.z = 0.2
 
         # Define rotation (orientation) of the camera

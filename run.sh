@@ -7,24 +7,24 @@
   ros2 launch ldlidar_stl_ros2 ld19.launch.py
 ) &
 
-(
-  ros2 launch turtlebot3_bringup robot.launch.py || exit
-) &
+# (
+#   ros2 launch turtlebot3_bringup robot.launch.py || exit
+# ) &
 
-(
-  docker start quirky_gould || exit
-  docker exec -it quirky_gould bash
-  cd
-  cd ros2_ws
-  source install/setup.bash
-  ros2 launch leg_detector lidar_leg_tracker.py
-) &
+# (
+#   docker start quirky_gould || exit
+#   docker exec -it quirky_gould bash
+#   cd
+#   cd ros2_ws
+#   source install/setup.bash
+#   ros2 launch leg_detector lidar_leg_tracker.py
+# ) &
 
-(
-  docker exec -it quirky_gould bash || exit
-  cd
-  python3 ros2_ws/src/ros2_leg_detector/src/leg_detector/scripts/publish_marker.py
-) &
+# (
+#   docker exec -it quirky_gould bash || exit
+#   cd
+#   python3 ros2_ws/src/ros2_leg_detector/src/leg_detector/scripts/publish_marker.py
+# ) &
 
 (
   cd /home/ntlong/har_capstone/fused_people_ws || exit
