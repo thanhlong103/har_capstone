@@ -140,8 +140,8 @@ class FusedPeopleSubscriber(Node):
 
         for group_id, cluster in groups.items():
             people_group = PeopleGroup()
-            people_group.header = Header()
-            people_group.header.stamp = self.get_clock().now().to_msg()
+            # people_group.header = Header()
+            # people_group.header.stamp = self.get_clock().now().to_msg()
             people_group.header.frame_id = "base_laser"
 
             # Check if the group is valid

@@ -106,7 +106,7 @@ class VisionLegTracker(Node):
 
         # Add a publisher for person coordinates
         self.coord_publisher = self.create_publisher(
-            PoseArray, "/people_vision_pos", 10
+            PoseArray, "/people_vision", 10
         )
         self.marker_publisher = self.create_publisher(MarkerArray, "/human_markers", 10)
 
@@ -134,8 +134,8 @@ class VisionLegTracker(Node):
         t.child_frame_id = "camera_frame"  # Camera frame
 
         # Define translation (position) of the camera
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = -0.3
+        t.transform.translation.x = -0.2
+        t.transform.translation.y = 0.0
         t.transform.translation.z = 0.2
 
         # Define rotation (orientation) of the camera
@@ -374,7 +374,7 @@ class VisionLegTracker(Node):
         D = np.dot(normal_vector, centroid)
 
         # Plane equation
-        print(f"Plane equation: {A:.4f}x + {B:.4f}y + {C:.4f}z + {D:.4f} = 0")
+        # print(f"Plane equation: {A:.4f}x + {B:.4f}y + {C:.4f}z + {D:.4f} = 0")
 
         normal_perpendicular = np.array([1, 0, 0])
 
@@ -477,7 +477,7 @@ class VisionLegTracker(Node):
             # print(keypoints)
 
             if bbox[4] > self.bbox_threshold:
-                print(left_shoulder, right_shoulder)
+                # print(left_shoulder, right_shoulder)
                 cv2.rectangle(
                     img, left_shoulder, right_shoulder, (0, 255, 0), 2
                 )  # Fill with blue
@@ -486,7 +486,7 @@ class VisionLegTracker(Node):
 
                 theta = self.facing_direction(normal, centroid)
 
-                print(theta)
+                # print(theta)
 
                 if left_shoulder[0] - right_shoulder[0] > 20:
                     theta = theta + 3.14
@@ -538,7 +538,7 @@ class VisionLegTracker(Node):
         fpsAvg = sumfps / len(self.fpsArr)
 
         if len(self.fpsArr) == 10:  # Reset every 10 frames
-            print(f"Avg FPS: {fpsAvg}")
+            # print(f"Avg FPS: {fpsAvg}")
             self.fpsArr = []
             sumfps = 0
 

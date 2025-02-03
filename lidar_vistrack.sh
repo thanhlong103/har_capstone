@@ -11,7 +11,7 @@
 (
   cd /home/ntlong/har_capstone/vision_people_tracker_ws || exit
   source tf/bin/activate
-  python3 vision_people_tracker.py
+  python3 HAR.py
 ) &
 
 # Launch Rviz2
