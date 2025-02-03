@@ -21,7 +21,7 @@ class MoveCylindersNode(Node):
             'moving_cylinder_4': {'x': 15.0, 'y': 0.0, 'z': 0.0}
         }
         
-        self.velocity = 0.5  # m/s for both cylinders
+        self.velocity = 0.1  # m/s for both cylinders
         self.last_time = time.time()
 
         # Start moving the cylinders

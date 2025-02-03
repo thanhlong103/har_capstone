@@ -39,7 +39,6 @@ install(DIRECTORY launch descriptions worlds
 install(
   PROGRAMS
   launch/robot_spawn.py
-  launch/moving_cylinder.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
