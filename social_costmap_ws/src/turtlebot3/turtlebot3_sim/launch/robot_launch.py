@@ -25,7 +25,7 @@ def generate_launch_description():
         name='robot_spawner',
         output='screen',
         parameters=[{
-            'urdf_path': "/home/irs/har_capstone/social_costmap_ws/src/turtlebot3/turtlebot3_sim/descriptions/robot.urdf",
+            'urdf_path': "/home/ntlong/har_capstone/social_costmap_ws/src/turtlebot3/turtlebot3_sim/descriptions/robot.urdf",
             'robot_name': 'turtlebot3',
             'x': 0.0,
             'y': 0.0,

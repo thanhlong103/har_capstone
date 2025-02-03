@@ -21,7 +21,7 @@ from visualization_msgs.msg import MarkerArray
 
 class VisionLegTracker(Node):
     def __init__(self):
-        super().__init__("vision_leg_tracker_node")
+        super().__init__("HAR_node")
         self.pipe = rs.pipeline()
         self.cfg = rs.config()
 
@@ -38,6 +38,7 @@ class VisionLegTracker(Node):
         self.label = "Warmup...."
         self.n_time_steps = 10
         self.lm_list = [[], [], [], [], [], []]
+        self.label = [None, None, None, None, None, None]
         self.prevAct = time.time()
         self.i = 0
         self.warmup_frames = 60
@@ -98,11 +99,17 @@ class VisionLegTracker(Node):
         except:
             print("Can not access the MoveNet!")
 
+        # Replace the HAR model loading section with:
         try:
-            self.model = tf.saved_model.load("./mymodel")
-            self.infer = self.model.signatures["serving_default"]
-        except:
-            print("Can not access HAR model")
+            # Load quantized HAR model
+            self.har_interpreter = tf.lite.Interpreter(model_path="model_quantized.tflite")
+            self.har_interpreter.allocate_tensors()
+            self.har_input_details = self.har_interpreter.get_input_details()
+            self.har_output_details = self.har_interpreter.get_output_details()
+            self.get_logger().info("HAR model loaded!")
+        except Exception as e:
+            self.get_logger().error(f"Failed to load HAR model: {e}")
+            raise
 
         self.get_logger().info("Vision Leg Tracker Node has started.")
 
@@ -417,16 +424,24 @@ class VisionLegTracker(Node):
         return c_lm
 
     def detectAct(self, lm_list):
-        lm_list = np.array(lm_list)
-        lm_list = np.expand_dims(lm_list, axis=0)
+        lm_list = np.array(lm_list, dtype=np.float32)  # Ensure correct dtype
+        lm_list = np.expand_dims(lm_list, axis=0)  # Shape: (1, 10, 51)
 
-        # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable all GPUs
+        # Set input tensor
+        self.har_interpreter.set_tensor(
+            self.har_input_details[0]['index'], lm_list
+        )
+        
+        # Run inference
+        self.har_interpreter.invoke()
+        
+        # Get output
+        output = self.har_interpreter.get_tensor(
+            self.har_output_details[0]['index']
+        )
+        results = np.argmax(output)
 
-        lm_tensor = tf.constant(lm_list, dtype=tf.float32)  # Ensure dtype is float32
-        results = np.argmax(self.infer(keras_tensor=lm_tensor)["output_0"].numpy())
-
-        # results = np.argmax(infer(tf.constant(lm_list))["output_0"].numpy())
-
+        # Label handling remains unchanged
         if results == 0:
             label = "HANDCLAPPING"
         elif results == 1:
@@ -439,9 +454,8 @@ class VisionLegTracker(Node):
             label = "RUNNING"
         else:
             label = "WALKING"
-
         return label
-
+    
     def draw_class_on_image(self, label, img, bbox):
         y, x, _ = img.shape
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -450,6 +464,7 @@ class VisionLegTracker(Node):
         fontColor = (0, 255, 0)
         thickness = 2
         lineType = 2
+        print(position)
         cv2.putText(
             img, label, position, font, fontScale, fontColor, thickness, lineType
         )
@@ -521,8 +536,11 @@ class VisionLegTracker(Node):
                     self.lm_list[i].append(c_lm)
                 if len(self.lm_list[i]) == self.n_time_steps:
                     label = self.detectAct(self.lm_list[i])
-                    self.draw_class_on_image(label, img, bbox)
+                    self.label[i] = label
                     self.lm_list[i] = []
+
+                if self.label[i] != None:
+                    self.draw_class_on_image(self.label[i], img, bbox)
 
                 cv2.rectangle(
                     img, left_shoulder, right_shoulder, (0, 255, 0), 2
