@@ -47,7 +47,7 @@ def main():
     rclpy.init()
 
     # Define URDF file path and robot details
-    urdf_path = '/home/ntlong/har_capstone/social_costmap_ws/src/turtlebot3/turtlebot3_sim/descriptions/robot.urdf'  # Update this to your URDF file path
+    urdf_path = '/home/irs/har_capstone/social_costmap_ws/src/turtlebot3/turtlebot3_sim/descriptions/robot.urdf'  # Update this to your URDF file path
     robot_name = 'mybot'
 
     # Create the spawner node and spawn the robot
