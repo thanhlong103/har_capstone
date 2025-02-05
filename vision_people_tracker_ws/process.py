@@ -36,7 +36,7 @@ def process_video(video_path, interpreter, output_file):
         print(f"Error opening video file {video_path}")
         return
 
-    input_size = 160  # MoveNet's input size
+    input_size = 128  # MoveNet's input size
 
     while True:
         ret, frame = cap.read()
@@ -74,8 +74,8 @@ def main():
     interpreter = tf.lite.Interpreter(model_path='1.tflite')  # Load MoveNet model
     interpreter.allocate_tensors()
 
-    # actions = ['walking', 'talking', 'walking_phone']  # Action categories
-    actions = ['walking_phone']  # Action categories
+    actions = ['walking', 'talking', 'walking_phone']  # Action categories
+    # actions = ['walking_phone']  # Action categories
 
     for action in actions:
         output_filename = f"{action}.txt"
