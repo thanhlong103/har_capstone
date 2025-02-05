@@ -45,6 +45,14 @@
   python3 vision_people_tracker.py
 ) &
 
+# Launch the vision_people_tracker
+(
+  cd /home/ntlong/har_capstone/fused_people_ws || exit
+  source install setup.bash
+  python3 convert.py
+) &
+
+
 # Launch Rviz2
 rviz2 &
 
