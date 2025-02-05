@@ -17,7 +17,7 @@
 #   cd
 #   cd ros2_ws
 #   source install/setup.bash
-#   ros2 launch leg_detector lidar_leg_tracker.py
+#   ros2 launch leg_detector lidar_leg_tracker.launch.py
 # ) &
 
 # (
