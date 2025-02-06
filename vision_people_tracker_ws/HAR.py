@@ -102,7 +102,7 @@ class VisionLegTracker(Node):
         # Replace the HAR model loading section with:
         try:
             # Load quantized HAR model
-            self.har_interpreter = tf.lite.Interpreter(model_path="model_quantized.tflite")
+            self.har_interpreter = tf.lite.Interpreter(model_path="model_quantized_custom.tflite")
             self.har_interpreter.allocate_tensors()
             self.har_input_details = self.har_interpreter.get_input_details()
             self.har_output_details = self.har_interpreter.get_output_details()
@@ -441,13 +441,15 @@ class VisionLegTracker(Node):
         )
         results = np.argmax(output)
 
+        print(output)
+
         # Label handling remains unchanged
         if results == 0:
-            label = "HANDCLAPPING"
+            label = "Walking"
         elif results == 1:
-            label = "BOXING"
+            label = "Talking"
         elif results == 2:
-            label = "HANDWAVING"
+            label = "Walking Phone"
         elif results == 3:
             label = "JOGGING"
         elif results == 4:
@@ -464,7 +466,7 @@ class VisionLegTracker(Node):
         fontColor = (0, 255, 0)
         thickness = 2
         lineType = 2
-        print(position)
+        # print(position)
         cv2.putText(
             img, label, position, font, fontScale, fontColor, thickness, lineType
         )
@@ -577,9 +579,9 @@ class VisionLegTracker(Node):
 
                 marker_array = self.publish_human_marker(marker_array, i, x, y)
 
-                self.get_logger().info(
-                    f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)"
-                )
+                # self.get_logger().info(
+                #     f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)"
+                # )
 
         # Publish the PoseArray if there are valid coordinates
         if poses.poses:
