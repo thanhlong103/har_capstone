@@ -33,15 +33,22 @@ def process_video(video_path, interpreter, output_file):
     """Processes each video to extract and save keypoints."""
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print(f"Error opening video file {video_path}")
+        print(f"Error opening video file: {video_path}")
         return
 
     input_size = 128  # MoveNet's input size
+    frame_count = 0
+
+    print(f"Processing video: {video_path}")
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
+
+        frame_count += 1
+        if frame_count % 10 == 0:
+            print(f"Processing frame {frame_count}")
 
         # Convert BGR to RGB and preprocess
         img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -66,19 +73,21 @@ def process_video(video_path, interpreter, output_file):
             line = ','.join(map(str, keypoints)) + '\n'
             output_file.write(line)
         else:
-            continue  # Skip frame if no valid person
+            print(f"Skipping frame {frame_count} due to low confidence")
 
     cap.release()
+    print(f"Finished processing {video_path}, total frames: {frame_count}")
 
 def main():
     interpreter = tf.lite.Interpreter(model_path='1.tflite')  # Load MoveNet model
     interpreter.allocate_tensors()
 
     actions = ['walking', 'talking', 'walking_phone']  # Action categories
-    # actions = ['walking_phone']  # Action categories
 
     for action in actions:
         output_filename = f"{action}.txt"
+        print(f"\nProcessing action: {action}")
+        
         with open(output_filename, 'w') as output_file:
             video_dir = os.path.join(os.getcwd(), action)
             if not os.path.isdir(video_dir):
@@ -86,10 +95,14 @@ def main():
                 continue
 
             video_files = [f for f in os.listdir(video_dir) if f.endswith('.mp4')]
+            if not video_files:
+                print(f"No videos found for {action}")
+
             for video_file in video_files:
                 video_path = os.path.join(video_dir, video_file)
-                print(f"Processing {video_path}")
+                print(f"Starting processing of {video_file}")
                 process_video(video_path, interpreter, output_file)
+                print(f"Finished processing {video_file}")
 
 if __name__ == "__main__":
     main()

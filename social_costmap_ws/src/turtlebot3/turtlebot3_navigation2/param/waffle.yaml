@@ -138,8 +138,8 @@ controller_server_rclcpp_node:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 5.0
-      publish_frequency: 2.0
+      update_frequency: 10.0
+      publish_frequency: 5.0
       global_frame: odom
       robot_base_frame: base_link
       use_sim_time: False
@@ -148,7 +148,7 @@ local_costmap:
       height: 3
       resolution: 0.05
       robot_radius: 0.22
-      plugin_names: ["obstacle_layer", "voxel_layer", "inflation_layer", "static_layer"]
+      plugin_names: ["obstacle_layer", "voxel_layer", "inflation_layer", "static_layer", "social_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         inflation_radius: 0.5
@@ -163,6 +163,23 @@ local_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
+      social_layer:
+        plugin: "nav2_social_costmap_plugin::SocialLayer"
+        people_topic: "/people"
+        enabled: True
+        cutoff: 10.0
+        amplitude: 255.0
+        publish_occgrid: False
+        use_passing: True
+        use_vel_factor: True
+        speed_factor_multiplier: 5.0
+        covariance_front_height: 0.4
+        covariance_front_width: 0.25
+        covariance_rear_height: 0.25
+        covariance_rear_width: 0.25
+        covariance_right_height: 0.3
+        covariance_right_width: 0.2
+        covariance_when_still: 0.25
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -228,20 +245,21 @@ global_costmap:
           data_type: "PointCloud2"
       social_layer:
         plugin: "nav2_social_costmap_plugin::SocialLayer"
+        people_topic: "/people"
         enabled: True
         cutoff: 10.0
-        amplitude: 200.0
-        publish_occgrid: True
+        amplitude: 255.0
+        publish_occgrid: False
         use_passing: True
         use_vel_factor: True
-        speed_factor_multiplier: 4.0
-        covariance_front_height: 0.2
-        covariance_front_width: 0.1
-        covariance_rear_height: 0.1
-        covariance_rear_width: 0.1
-        covariance_right_height: 0.2
-        covariance_right_width: 0.1
-        covariance_when_still: 0.1
+        speed_factor_multiplier: 5.0
+        covariance_front_height: 0.4
+        covariance_front_width: 0.25
+        covariance_rear_height: 0.25
+        covariance_rear_width: 0.25
+        covariance_right_height: 0.3
+        covariance_right_width: 0.2
+        covariance_when_still: 0.25
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
