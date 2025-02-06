@@ -17,7 +17,7 @@ class MoveCylinderNode(Node):
         
         # Set the initial position of the cylinder
         self.cylinder_position = -5
-        self.velocity = 0.1 # m/s
+        self.velocity = 0.2 # m/s
         self.last_time = time.time()
 
         # Start moving the cylinder
