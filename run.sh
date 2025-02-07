@@ -62,6 +62,9 @@
   # python3 convert.py
 ) &
 
+(
+  python3 filter_lidar.py || exit
+) &
 
 # Launch Rviz2
 rviz2 &

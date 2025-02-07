@@ -88,6 +88,7 @@ class VisionLegTracker(Node):
         self.intrinsics = None
 
         self.prev_person_pos = [0.0, 0.0, 0.0]
+        self.prev_person_marker_ids = set()
 
         try:
             self.interpreter = tf.lite.Interpreter(model_path="1.tflite")
@@ -173,7 +174,7 @@ class VisionLegTracker(Node):
         cylinder_marker.header.frame_id = "camera_frame"
         cylinder_marker.header.stamp = self.get_clock().now().to_msg()
         cylinder_marker.ns = "humans"
-        cylinder_marker.id = id * 2 + 1
+        cylinder_marker.id = id * 2 + 1000
         cylinder_marker.type = Marker.CYLINDER
         cylinder_marker.action = Marker.ADD
         cylinder_marker.pose.position.x = x
@@ -405,6 +406,8 @@ class VisionLegTracker(Node):
         return theta
 
     def processImage(self):
+        current_ids = set()
+
         frame = self.pipe.wait_for_frames()
 
         aligned_frames = self.align.process(frame)
@@ -511,11 +514,34 @@ class VisionLegTracker(Node):
                 # pose.orientation.z = theta
                 poses.poses.append(pose)
 
+                current_ids.add(i)
+
                 marker_array = self.publish_human_marker(marker_array, i, x, y)
 
-                self.get_logger().info(
-                    f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)"
-                )
+                # self.get_logger().info(
+                #     f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)"
+                # )
+            
+        # Add delete markers for people no longer detected
+        for prev_id in self.prev_person_marker_ids - current_ids:
+            delete_sphere_marker = Marker()
+            delete_sphere_marker.header.frame_id = "base_laser"
+            delete_sphere_marker.header.stamp = self.get_clock().now().to_msg()
+            delete_sphere_marker.ns = "humans"
+            delete_sphere_marker.id = prev_id
+            delete_sphere_marker.action = Marker.DELETE
+
+            delete_cylinder_marker = Marker()
+            delete_cylinder_marker.header.frame_id = "base_laser"
+            delete_cylinder_marker.header.stamp = self.get_clock().now().to_msg()
+            delete_cylinder_marker.ns = "humans"
+            delete_cylinder_marker.id = prev_id + 1000
+            delete_cylinder_marker.action = Marker.DELETE
+
+            marker_array.markers.append(delete_sphere_marker)
+            marker_array.markers.append(delete_cylinder_marker)
+        
+        self.prev_person_marker_ids = current_ids
 
         # Publish the PoseArray if there are valid coordinates
         if poses.poses:

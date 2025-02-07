@@ -42,29 +42,11 @@ class PersonFusion(Node):
         std_pos = std_process_noise
         std_vel = std_process_noise
         std_obs = 0.1
-        std_obs_vision = 0.0001
+
         var_pos = std_pos**2
         var_vel = std_vel**2
         var_obs_local = std_obs**2
         self.var_obs = (std_obs + 0.4) ** 2
-
-        self.filtered_state_means = np.array([0.0, 0.0, 0.0, 0.0])  # Initialize at origin
-        self.pos_x = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
-        self.pos_y = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
-        self.vel_x = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
-        self.vel_y = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
-        self.orientation_x = 0.0
-        self.orientation_y = 0.0
-        self.orientation_z = 0.0
-        self.orientation_w = 0.0
-
-        self.pos_x_laser = 0.0
-        self.pos_y_laser = 0.0
-
-        self.pos_x_vision = 0.0
-        self.pos_y_vision = 0.0
-
-        self.filtered_state_covariances = 0.5 * np.eye(4)
 
         transition_matrix = np.array(
             [[1, 0, delta_t, 0], [0, 1, 0, delta_t], [0, 0, 1, 0], [0, 0, 0, 1]]
@@ -90,69 +72,141 @@ class PersonFusion(Node):
             observation_covariance=observation_covariance,
         )
 
+        self.lidar_people = {}
+        self.vision_people = {}
+        self.people = {}
         self.vision_people_array = []
         self.lidar_people_array = []
+        self.next_id = 0
+        self.pose_threshold = 2.0
 
-    def update(self, observations, observation_covariance, id):
-        """Update tracked object with new observations"""
+    def add_person(self, dict, person_id, pos_x, pos_y, orientation):
+        """Initialize a new person with a unique ID"""
+        dict[person_id] = {
+            "filtered_state_means": [pos_x, pos_y, 0.0, 0.0],
+            "filtered_state_covariances": 0.5 * np.eye(4),
+            "pos_x_vision": pos_x,
+            "pos_y_vision": pos_y,
+            "orientation_x": orientation[0],
+            "orientation_y": orientation[1],
+            "orientation_z": orientation[2],
+            "orientation_w": orientation[3],
+            "last_updated": time.time(),
+        }
 
-        if observation_covariance != []:  # Check for empty list
-            self.filtered_state_means, self.filtered_state_covariances = (
+    def find_matching_person(self, dict, pos_x, pos_y):
+        """Find an existing person within a certain distance threshold"""
+        for person_id, data in dict.items():
+            distance = np.linalg.norm(
+                [data["pos_x_vision"] - pos_x, data["pos_y_vision"] - pos_y]
+            )
+            if distance < self.pose_threshold:
+                return person_id  # Return existing person's ID if matched
+        return None  # No match found
+
+    def remove_stale_people(self, dict):
+        """Remove people who haven't been updated in 3 seconds"""
+        current_time = time.time()
+        timeout = 3  # Time threshold (seconds)
+
+        stale_people = [pid for pid, data in dict.items() 
+                        if current_time - data["last_updated"] > timeout]
+
+        for pid in stale_people:
+            del dict[pid]  # Remove stale person
+            print(f"Removed {pid} due to inactivity")
+
+    def update(self, person_dict, person_id, observations, observation_covariance):
+        """Update the Kalman filter for a tracked person."""
+        if person_id not in person_dict:
+            print(f"Person ID {person_id} not found in dictionary.")
+            return
+
+        person = person_dict[person_id]
+
+        if "filtered_state_means" not in person:
+            # Initialize Kalman state if not present
+            person["filtered_state_means"] = np.array([observations[0], observations[1], 0.0, 0.0])
+            person["filtered_state_covariances"] = self.filtered_state_covariances.copy()
+        
+        # Perform Kalman filter update
+        if observation_covariance is not None:
+            person["filtered_state_means"], person["filtered_state_covariances"] = (
                 self.kf.filter_update(
-                    filtered_state_mean=self.filtered_state_means,
-                    filtered_state_covariance=self.filtered_state_covariances,
+                    filtered_state_mean=person["filtered_state_means"],
+                    filtered_state_covariance=person["filtered_state_covariances"],
                     observation=observations,
                     observation_covariance=observation_covariance,
                 )
             )
         else:
-            self.filtered_state_means, self.filtered_state_covariances = (
+            person["filtered_state_means"], person["filtered_state_covariances"] = (
                 self.kf.filter_update(
-                    filtered_state_mean=self.filtered_state_means,
-                    filtered_state_covariance=self.filtered_state_covariances,
+                    filtered_state_mean=person["filtered_state_means"],
+                    filtered_state_covariance=person["filtered_state_covariances"],
                     observation=observations,
                 )
             )
+        
+        # Update the person's estimated position and velocity
+        person["pos_x"] = person["filtered_state_means"][0]
+        person["pos_y"] = person["filtered_state_means"][1]
+        person["vel_x"] = person["filtered_state_means"][2]
+        person["vel_y"] = person["filtered_state_means"][3]
+        
+        # Update the last updated timestamp
+        person["last_updated"] = time.time()
 
-        self.pos_x[id] = self.filtered_state_means[0]
-        self.pos_y[id] = self.filtered_state_means[1]
-        self.vel_x[id] = self.filtered_state_means[2]
-        self.vel_y[id] = self.filtered_state_means[3]
 
     def vision_callback(self, people):
-        self.vision_people_array = []
-        """Process vision data"""
-        for pose in people.poses:
-            pos_x = pose.position.x
-            pos_y = pose.position.y
-            orientation_x = pose.orientation.x
-            orientation_y = pose.orientation.y
-            orientation_z = pose.orientation.z
-            orientation_w = pose.orientation.w
-            # print(pos_x, pos_y)
-            self.vision_people_array.append(
-                [
-                    pos_x,
-                    pos_y,
-                    orientation_x,
-                    orientation_y,
-                    orientation_z,
-                    orientation_w,
-                ]
-            )
-        self.run()
+        """Process vision data and track people"""
+        self.vision_people_array = []  # Reset vision people array
 
-    def vision_update(self, pos_x, pos_y, id):
-        """Update filter with vision data"""
         std_obs_vision = 0.0001
         var_obs_local = std_obs_vision**2
         observation_covariance = var_obs_local * np.eye(2)
-        self.pos_x_vision = pos_x
-        self.pos_y_vision = pos_y
-        observations = np.array([pos_x, pos_y])
 
-        self.update(observations, observation_covariance, id)
-        # self.get_logger().info(f"Update with vision information before: {pos_x}, {pos_y} after: {self.pos_x}, {self.pos_y}")
+        for pose in people.poses:
+            pos_x = pose.position.x
+            pos_y = pose.position.y
+            orientation = [
+                pose.orientation.x,
+                pose.orientation.y,
+                pose.orientation.z,
+                pose.orientation.w,
+            ]
+
+            # Check if this person already exists
+            person_id = self.find_matching_person(self.vision_people, pos_x, pos_y)
+
+            if person_id is None:
+                # If not found, create a new person with a unique ID
+                person_id = f"vision_{self.next_id}"
+                self.next_id += 1
+                self.add_person(self.vision_people, person_id, pos_x, pos_y, orientation)
+
+            # Update the person's position and timestamp
+            self.vision_people[person_id].update({
+                "pos_x": pos_x,
+                "pos_y": pos_y,
+                "orientation_x": orientation[0],
+                "orientation_y": orientation[1],
+                "orientation_z": orientation[2],
+                "orientation_w": orientation[3],
+                "last_updated": time.time(),
+            })
+
+            # Store for reference
+            self.vision_people_array.append([pos_x, pos_y] + orientation)
+
+            person = self.vision_people[person_id]
+
+            self.update(self.vision_people, person_id, [person["pos_x"], person["pos_y"]], observation_covariance)
+
+        # print(self.vision_people)
+
+        self.remove_stale_people(self.vision_people)  # Remove old detections
+        self.publish(self.vision_people)
 
     def laser_callback(self, people):
         """Process lidar data"""
@@ -162,132 +216,56 @@ class PersonFusion(Node):
                 pos_x = person.pose.position.x
                 pos_y = person.pose.position.y
 
+                # Check if this person already exists
+                person_id = self.find_matching_person(self.lidar_people, pos_x, pos_y)
+
+                if person_id is None:
+                    # If not found, create a new person with a unique ID
+                    person_id = f"lidar_{self.next_id}"
+                    self.next_id += 1
+                    self.add_person(self.lidar_people, person_id, pos_x, pos_y, [0.0, 0.0, 0.0, 0.0])
+
+                # Update the person's position and timestamp
+                self.lidar_people[person_id].update({
+                    "pos_x": pos_x,
+                    "pos_y": pos_y,
+                    "last_updated": time.time(),
+                })
+
+                # Store for reference
                 self.lidar_people_array.append([pos_x, pos_y])
-            self.run()
 
-    def laser_update(self, pos_x, pos_y, id):
-        """Update filter with lidar data"""
-        self.pos_x_laser = pos_x
-        self.pos_y_laser = pos_y
-        observations = np.array([pos_x, pos_y])
-        self.update(observations, [], id)  # Empty list for default covariance
-        # self.get_logger().info(f"Update with laser information before: {pos_x}, {pos_y} after: {self.pos_x}, {self.pos_y}")
+                person = self.lidar_people[person_id]
 
-    def get_publish_person(self, id):
-        """Publish fused person data"""
-        pubPerson = FusedPerson()
-        pubPerson.position.position.x = self.pos_x[id]
-        pubPerson.position.position.y = self.pos_y[id]
-        pubPerson.position.position.z = 0.0
-        pubPerson.position.orientation.x = self.orientation_x
-        pubPerson.position.orientation.y = self.orientation_y
-        pubPerson.position.orientation.z = self.orientation_z
-        pubPerson.position.orientation.w = self.orientation_w
-        pubPerson.velocity.x = -self.vel_x[id]
-        pubPerson.velocity.y = -self.vel_y[id]
-        pubPerson.velocity.z = 0.0
+                self.update(self.lidar_people, person_id, [person["pos_x"], person["pos_y"]], None)
 
-        return pubPerson
+        # print(self.lidar_people)
 
-    def get_pos_pair(self, vision_people_array, lidar_people_array, threshold):
-        matched_pairs = []
+        self.remove_stale_people(self.lidar_people)  # Remove old detections
+        self.publish(self.lidar_people)
 
-        # Create a list to track used indices
-        vision_used = [False] * len(vision_people_array)
-        lidar_used = [False] * len(lidar_people_array)
+    def publish(self, dict):
+        """Publish fused people data"""
+        fused_people_msg = FusedPersonArray()
+        fused_people_msg.header.stamp = self.get_clock().now().to_msg()
+        fused_people_msg.header.frame_id = "base_laser"  # Adjust based on your frame of reference
 
-        for i, vision_person in enumerate(vision_people_array):
-            for j, lidar_person in enumerate(lidar_people_array):
-                # Check if detected persons from two data streams are aligned
-                dis = (
-                    (vision_person[0] - lidar_person[0]) ** 2
-                    + (vision_person[1] - lidar_person[1]) ** 2
-                ) ** 0.5
+        for person_id, person in dict.items():
+            fused_person = FusedPerson()
+            fused_person.position.position.x = person["pos_x"]
+            fused_person.position.position.y = person["pos_y"]
+            fused_person.position.position.z = 0.0
+            fused_person.position.orientation.x = person["orientation_x"]
+            fused_person.position.orientation.y = person["orientation_y"]
+            fused_person.position.orientation.z = person["orientation_z"]
+            fused_person.position.orientation.w = person["orientation_w"]
+            fused_person.velocity.x = person["vel_x"]
+            fused_person.velocity.y = person["vel_y"]
+            fused_person.velocity.z = 0.0
 
-                if dis < threshold:
-                    matched_pairs.append(
-                        [
-                            [
-                                vision_person[0],
-                                vision_person[1],
-                                vision_person[2],
-                                vision_person[3],
-                                vision_person[4],
-                                vision_person[5]
-                            ],
-                            [lidar_person[0], lidar_person[1]],
-                        ]
-                    )
-                    vision_used[i] = True
-                    lidar_used[j] = True
+            fused_people_msg.people.append(fused_person)
 
-        # Add unmatched vision detections with (0, 0) for lidar
-        for i, used in enumerate(vision_used):
-            if not used:
-                matched_pairs.append(
-                    [
-                        [
-                            vision_people_array[i][0],
-                            vision_people_array[i][1],
-                            vision_people_array[i][2],
-                            vision_people_array[i][3],
-                            vision_people_array[i][4],
-                            vision_people_array[i][5],
-                        ],
-                        [0.0, 0.0],
-                    ]
-                )
-
-        # Add unmatched lidar detections with (0, 0) for vision
-        for j, used in enumerate(lidar_used):
-            if not used:
-                matched_pairs.append(
-                    [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [lidar_people_array[j][0], lidar_people_array[j][1]]]
-                )
-
-        return matched_pairs
-
-    def run(self):
-        vision_lidar_pairs = self.get_pos_pair(
-            self.vision_people_array,
-            self.lidar_people_array,
-            distance_sources_threshold,
-        )
-
-        pubPersonArray = FusedPersonArray()
-        pubPersonArray.header = std_msgs.msg.Header()
-        pubPersonArray.header.stamp = self.get_clock().now().to_msg()
-        pubPersonArray.header.frame_id = "base_laser"
-        pubPersonArray.people = []
-
-        people_count = 0
-
-        for i, pair in enumerate(vision_lidar_pairs):
-            vision_position, lidar_position = vision_lidar_pairs[i]
-            
-            self.orientation_x = vision_position[2]
-            self.orientation_y = vision_position[3]
-            self.orientation_z = vision_position[4]
-            self.orientation_w = vision_position[5]
-
-            if lidar_position == [0.0, 0.0]:
-                self.vision_update(vision_position[0], vision_position[1], i)
-                self.vel_x[i] = 0.0
-                self.vel_y[i] = 0.0
-            elif vision_position == [0.0, 0.0]:
-                self.laser_update(lidar_position[0], lidar_position[1], i)
-            else:
-                self.laser_update(vision_position[0], vision_position[1], i)
-                self.vision_update(lidar_position[0], lidar_position[1], i)
-
-            pubPerson = self.get_publish_person(i)
-            pubPersonArray.people.append(pubPerson)
-
-            people_count += 1
-
-        self.people_fused_pub.publish(pubPersonArray)
-        self.get_logger().info(f"Publish {people_count} fused people location: {pubPersonArray}")
-
+        self.people_fused_pub.publish(fused_people_msg)
 
 def main(args=None):
     rclpy.init(args=args)
