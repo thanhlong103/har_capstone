@@ -1,25 +1,14 @@
-fused_people_ws/build/
+socin_robot_ws/build/
 
-fused_people_ws/install/
+socin_robot_ws/install/
 
-fused_people_ws/log/
+socin_robot_ws/log/
 
 lidar_leg_tracker_ws/build/
 
 lidar_leg_tracker_ws/install/
 
 lidar_leg_tracker_ws/log/
-
-lidar_ws/build/
-
-lidar_ws/install/
-
-lidar_ws/log/
-
-social_costmap_ws/build/
-
-social_costmap_ws/install/
-social_costmap_ws/log/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

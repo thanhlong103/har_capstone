@@ -28,28 +28,28 @@
 # ) &
 
 #========== ROBOT BRINGUP ============
-(
-  cd /home/ntlong/har_capstone/social_costmap_ws || exit
-  source install/setup.bash
-  ros2 launch turtlebot3_bringup robot.launch.py
-) &
+# (
+#   cd /home/ntlong/har_capstone/social_costmap_ws || exit
+#   source install/setup.bash
+#   ros2 launch turtlebot3_bringup robot.launch.py
+# ) &
 
 #========== FUSING DATA AND GROUP DETECTION ===========
 (
-  cd /home/ntlong/har_capstone/fused_people_ws || exit
+  cd /home/ntlong/har_capstone/socin_robot_ws || exit
   source install/setup.bash
   ros2 run fusing_people fusing_people
 ) &
 
 (
-  cd /home/ntlong/har_capstone/fused_people_ws || exit
+  cd /home/ntlong/har_capstone/socin_robot_ws || exit
   source install/setup.bash
   ros2 run fusing_people fused_group
 ) &
 
 # Launch the vision_people_tracker
 (
-  cd /home/ntlong/har_capstone/vision_people_tracker_ws || exit
+  cd /home/ntlong/har_capstone/socin_robot_ws/src/vision_people_tracker/src || exit
   source tf/bin/activate
   python3 vision_people_tracker.py
 ) &
@@ -57,9 +57,9 @@
 # Launch the vision_people_tracker
 (
   cd /home/ntlong/har_capstone/fused_people_ws || exit
-  source install setup.bash
+  source install/setup.bash
   cd src
-  python3 convert.py
+  # python3 convert.py
 ) &
 
 
