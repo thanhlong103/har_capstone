@@ -68,8 +68,16 @@ class PeopleFusedConverter(Node):
                 fused_person.position.position.z
             ])
 
+            vel_map = np.array([
+                fused_person.velocity.x,
+                fused_person.velocity.y,
+                fused_person.velocity.z
+            ])
+
             # Apply transformation: R * pos_map + T
             pos_base_link = rotation_matrix @ pos_map + np.array([t_x, t_y, t_z])
+
+            vel_base_link = rotation_matrix @ vel_map
 
             # Set transformed position
             person.position = Point(
@@ -78,7 +86,13 @@ class PeopleFusedConverter(Node):
                 z=pos_base_link[2]
             )
 
-            person.velocity = fused_person.velocity
+            person.velocity= Point(
+                x=vel_base_link[0],
+                y=vel_base_link[1],
+                z=vel_base_link[2]
+            )
+
+            # person.velocity = fused_person.velocity
             person.reliability = 1.0  # Assuming perfect reliability
             person.tagnames = ["Tag1"]  # Placeholder
             person.tags = []  # Placeholder
