@@ -24,8 +24,8 @@ class PeoplePublisher(Node):
         # Person 1
         person1 = Person()
         person1.name = "Person 1"
-        person1.position = Point(x=1.0, y=2.0, z=0.0)
-        person1.velocity = Point(x=0.1, y=0.1, z=0.0)
+        person1.position = Point(x=4.5, y=9.5, z=0.0)
+        person1.velocity = Point(x=1.0, y=-1.0, z=0.0)
         person1.reliability = 0.95
         person1.tagnames = ["tag1", "tag2"]
         person1.tags = ["tag_value_1", "tag_value_2"]
@@ -33,14 +33,23 @@ class PeoplePublisher(Node):
         # Person 2
         person2 = Person()
         person2.name = "Person 2"
-        person2.position = Point(x=3.0, y=4.0, z=0.0)
-        person2.velocity = Point(x=-0.1, y=-0.1, z=0.0)
+        person2.position = Point(x=6.0, y=10.5, z=0.0)
+        person2.velocity = Point(x=1.0, y=-1.0, z=0.0)
         person2.reliability = 0.90
         person2.tagnames = ["tag3", "tag4"]
         person2.tags = ["tag_value_3", "tag_value_4"]
+
+        # Person 2
+        person3 = Person()
+        person3.name = "Person 2"
+        person3.position = Point(x=6.0, y=9.0, z=0.0)
+        person3.velocity = Point(x=1.0, y=-1.0, z=0.0)
+        person3.reliability = 0.90
+        person3.tagnames = ["tag3", "tag4"]
+        person3 .tags = ["tag_value_3", "tag_value_4"]
         
         # Add people to the people message
-        self.people_msg.people = [person1, person2]
+        self.people_msg.people = [person1, person2, person3]
 
     def publish_people(self):
         # Populate the header (set the timestamp to the current time)

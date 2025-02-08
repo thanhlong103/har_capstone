@@ -31,9 +31,10 @@ protected:
   double max_interaction_distance_;
   double interaction_width_;
   unsigned char interaction_cost_;
+  double interaction_amplitude_;
+  double interaction_length_scale_;
+  double interaction_width_scale_;
   
-  // Helper function
-  double distanceToLineSegment(double x, double y, double x1, double y1, double x2, double y2);
 public:
   SocialLayer() { layered_costmap_ = NULL; }
 
@@ -51,6 +52,12 @@ public:
   // virtual void onFootprintChanged();
 
   virtual bool isClearable() { return false; }
+
+  // Helper function
+  double distanceToLineSegment(double x, double y, double x1, double y1, double x2, double y2);
+  double distanceToMergedRegion(double wx, double wy, const std::vector<geometry_msgs::msg::Point>& hull);
+  std::vector<std::vector<people_msgs::msg::Person>> clusterPeople(const std::list<people_msgs::msg::Person>& people,double max_group_distance);
+  std::vector<geometry_msgs::msg::Point> computeConvexHull(const std::vector<people_msgs::msg::Person>& group);
 
 private:
   void get_parameters();

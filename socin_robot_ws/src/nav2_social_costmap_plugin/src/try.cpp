@@ -206,6 +206,62 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
   }
 }
 
+// Function to cluster people into groups using distance threshold
+std::vector<std::vector<people_msgs::msg::Person>> clusterPeople(
+  const std::list<people_msgs::msg::Person>& people,
+  double max_group_distance) {
+  std::vector<std::vector<people_msgs::msg::Person>> groups;
+  std::unordered_set<int> processed;
+
+  int idx = 0;
+  for (const auto& person : people) {
+    if (processed.find(idx) == processed.end()) {
+      std::vector<people_msgs::msg::Person> group;
+      std::queue<int> to_process;
+      to_process.push(idx);
+      processed.insert(idx);
+
+      while (!to_process.empty()) {
+        int current = to_process.front();
+        to_process.pop();
+        group.push_back(*std::next(people.begin(), current));
+
+        int inner_idx = 0;
+        for (const auto& other : people) {
+          if (processed.find(inner_idx) == processed.end()) {
+            double dx = group.back().position.x - other.position.x;
+            double dy = group.back().position.y - other.position.y;
+            double dist = sqrt(dx * dx + dy * dy);
+            if (dist <= max_group_distance) {
+              to_process.push(inner_idx);
+              processed.insert(inner_idx);
+            }
+          }
+          inner_idx++;
+        }
+      }
+      groups.push_back(group);
+    }
+    idx++;
+  }
+  return groups;
+}
+
+// Function to compute convex hull of a group
+std::vector<geometry_msgs::msg::Point> computeConvexHull(
+  const std::vector<people_msgs::msg::Person>& group) {
+  std::vector<geometry_msgs::msg::Point> points;
+  for (const auto& person : group) {
+    geometry_msgs::msg::Point pt;
+    pt.x = person.position.x;
+    pt.y = person.position.y;
+    points.push_back(pt);
+  }
+  // Implement convex hull algorithm here (e.g., Andrew's monotone chain)
+  // Return the convex hull polygon points
+  return points;
+}
+
 void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
                               int min_i, int min_j, int max_i, int max_j) {
   if (!enabled_) {
@@ -368,95 +424,75 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
       }
     }
   }
-  // In updateCosts(), replace the interaction cost application with this:
-  if (transformed_people_.size() >= 2) {
-    // Iterate through all combinations of people
-    for (auto p1_it = transformed_people_.begin(); p1_it != std::prev(transformed_people_.end()); ++p1_it) {
-      for (auto p2_it = std::next(p1_it); p2_it != transformed_people_.end(); ++p2_it) {
-        people_msgs::msg::Person person1 = *p1_it;
-        people_msgs::msg::Person person2 = *p2_it;
+  // In updateCosts():
+  if (!transformed_people_.empty()) {
+    // Cluster people into groups
+    auto groups = clusterPeople(transformed_people_, max_interaction_distance_);
 
-        // Calculate distance between people
-        double dx = person1.position.x - person2.position.x;
-        double dy = person1.position.y - person2.position.y;
-        double distance = sqrt(dx * dx + dy * dy);
+    for (const auto& group : groups) {
+      if (group.size() < 2) continue; // Skip single-person groups
 
-        // Skip if people are too far apart
-        if (distance > max_interaction_distance_) continue;
+      // Compute merged region (convex hull)
+      auto hull = computeConvexHull(group);
 
-        // Calculate line segment endpoints
-        double x1 = person1.position.x;
-        double y1 = person1.position.y;
-        double x2 = person2.position.x;
-        double y2 = person2.position.y;
+      // Bounding box of the merged region
+      double min_x = std::numeric_limits<double>::max();
+      double min_y = std::numeric_limits<double>::max();
+      double max_x = std::numeric_limits<double>::lowest();
+      double max_y = std::numeric_limits<double>::lowest();
+      for (const auto& pt : hull) {
+        min_x = std::min(min_x, pt.x);
+        min_y = std::min(min_y, pt.y);
+        max_x = std::max(max_x, pt.x);
+        max_y = std::max(max_y, pt.y);
+      }
 
-        // Calculate bounding box for the interaction area
-        double padding = interaction_width_ * 2.0; // Add padding for Gaussian drop-off
-        double min_x = std::min(x1, x2) - padding;
-        double max_x = std::max(x1, x2) + padding;
-        double min_y = std::min(y1, y2) - padding;
-        double max_y = std::max(y1, y2) + padding;
+      // Add padding for Gaussian drop-off
+      double padding = interaction_width_ * 3.0;
+      min_x -= padding;
+      min_y -= padding;
+      max_x += padding;
+      max_y += padding;
 
-        // Convert to map coordinates
-        int min_i, min_j, max_i, max_j;
-        costmap->worldToMapNoBounds(min_x, min_y, min_i, min_j);
-        costmap->worldToMapNoBounds(max_x, max_y, max_i, max_j);
+      // Convert to map coordinates
+      int min_i, min_j, max_i, max_j;
+      costmap->worldToMapNoBounds(min_x, min_y, min_i, min_j);
+      costmap->worldToMapNoBounds(max_x, max_y, max_i, max_j);
 
-        // Clamp to costmap bounds
-        min_i = std::max(min_i, 0);
-        min_j = std::max(min_j, 0);
-        max_i = std::min(max_i, static_cast<int>(costmap->getSizeInCellsX()) - 1);
-        max_j = std::min(max_j, static_cast<int>(costmap->getSizeInCellsY()) - 1);
+      // Clamp to costmap bounds
+      min_i = std::max(min_i, 0);
+      min_j = std::max(min_j, 0);
+      max_i = std::min(max_i, static_cast<int>(costmap->getSizeInCellsX()) - 1);
+      max_j = std::min(max_j, static_cast<int>(costmap->getSizeInCellsY()) - 1);
 
-        // Iterate through potential affected cells
-        for (int j = min_j; j <= max_j; ++j) {
-          for (int i = min_i; i <= max_i; ++i) {
-            double wx, wy;
-            costmap->mapToWorld(i, j, wx, wy);
+      // Iterate through cells in the bounding box
+      for (int j = min_j; j <= max_j; ++j) {
+        for (int i = min_i; i <= max_i; ++i) {
+          double wx, wy;
+          costmap->mapToWorld(i, j, wx, wy);
 
-            // Calculate perpendicular distance to the line segment
-            double dist = distanceToLineSegment(wx, wy, x1, y1, x2, y2);
+          // Calculate signed distance to merged region
+          double dist = distanceToMergedRegion(wx, wy, hull);
 
-            // If the cell is on the line, set cost to 254
-            if (dist <= interaction_width_ / 10.0) {
+          // Inside the merged region: Fixed high cost
+          if (dist >= 0) {
+            unsigned char old_cost = costmap->getCost(i, j);
+            costmap->setCost(i, j, std::max(old_cost, static_cast<unsigned char>(254)));
+          }
+          // Outside the merged region: Gaussian drop-off
+          else {
+            double abs_dist = -dist;
+            double gaussian_value = interaction_amplitude_ * exp(-(abs_dist * abs_dist) / (2.0 * interaction_width_scale_ * interaction_width_scale_));
+            if (gaussian_value >= cutoff_) {
               unsigned char old_cost = costmap->getCost(i, j);
-              unsigned char new_cost = 254; // Fixed high cost along the line
-              costmap->setCost(i, j, std::max(old_cost, new_cost));
-
-              if (publish_occgrid_) {
-                unsigned int index = costmap->getIndex(i, j);
-                grid.data[index] = new_cost;
-              }
-            }
-            // If the cell is near the line, apply Gaussian drop-off
-            else if (dist <= interaction_width_) {
-              // Calculate Gaussian drop-off based on perpendicular distance
-              double gaussian_value = interaction_amplitude_ * exp(-(dist * dist) / (2.0 * interaction_width_scale_ * interaction_width_scale_));
-
-              // Apply cutoff
-              if (gaussian_value < cutoff_) continue;
-
-              // Get existing cost
-              unsigned char old_cost = costmap->getCost(i, j);
-
-              // Combine costs using maximum
               unsigned char new_cost = std::max(old_cost, static_cast<unsigned char>(gaussian_value));
-
-              // Update costmap
               costmap->setCost(i, j, new_cost);
-
-              // Update occupancy grid
-              if (publish_occgrid_) {
-                unsigned int index = costmap->getIndex(i, j);
-                grid.data[index] = new_cost;
-              }
             }
           }
         }
       }
     }
   }
-  if (publish_occgrid_)
     grid_pub_->publish(grid);
 }
 
@@ -497,6 +533,26 @@ double SocialLayer::distanceToLineSegment(double x, double y,
   double proj_y = y1 + t*dy;
 
   return sqrt((x - proj_x)*(x - proj_x) + (y - proj_y)*(y - proj_y));
+}
+
+// Function to compute signed distance to convex hull
+double distanceToMergedRegion(double wx, double wy,
+  const std::vector<geometry_msgs::msg::Point>& hull) {
+  double min_dist = std::numeric_limits<double>::max();
+  bool inside = true; // Assume point is inside (simplified for example)
+
+  SocialLayer social_layer;
+
+  // Simplified logic: Compute distance to the nearest edge of the hull
+  // For actual implementation, use ray-casting for inside/outside check
+  for (size_t i = 0; i < hull.size(); ++i) {
+    size_t j = (i + 1) % hull.size();
+    double x1 = hull[i].x, y1 = hull[i].y;
+    double x2 = hull[j].x, y2 = hull[j].y;
+    double dist = social_layer.distanceToLineSegment(wx, wy, x1, y1, x2, y2);
+  if (dist < min_dist) min_dist = dist;
+  }
+  return inside ? min_dist : -min_dist;
 }
 
 } // namespace nav2_social_costmap_plugin
