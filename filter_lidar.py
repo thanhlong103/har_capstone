@@ -16,18 +16,20 @@ class FilteredScanNode(Node):
     def scan_callback(self, msg):
         filtered_msg = msg  # Copy the original message
 
-        # Convert NaN-safe NumPy array
+        # Convert to NaN-safe NumPy array
         ranges_array = np.array(msg.ranges)
 
-        angle_min = msg.angle_min  # 0.0
-        angle_max = msg.angle_max  # ~6.28
+        angle_min = msg.angle_min  
         angle_increment = msg.angle_increment
 
-        # Calculate index range for 135° to 225° (π/2 to 3π/2 radians)
-        start_index = int((np.pi / 2 - angle_min) / angle_increment)
-        end_index = int((3 * np.pi / 2 - angle_min) / angle_increment)
+        # Define 20-degree cut range around 180° (pi)
+        cut_angle = np.pi  # 180 degrees in radians
+        cut_range = np.deg2rad(10)  # 10 degrees in radians
 
-        # Set back scan ranges to NaN
+        start_index = int((cut_angle - cut_range - angle_min) / angle_increment)
+        end_index = int((cut_angle + cut_range - angle_min) / angle_increment)
+
+        # Set the selected range to NaN
         ranges_array[start_index:end_index] = np.nan
 
         # Assign modified ranges back to the message

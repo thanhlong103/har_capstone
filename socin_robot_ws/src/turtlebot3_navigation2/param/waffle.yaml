@@ -144,11 +144,11 @@ local_costmap:
       robot_base_frame: base_link
       use_sim_time: False
       rolling_window: true
-      width: 4
-      height: 4
+      width: 5
+      height: 5
       resolution: 0.05
       robot_radius: 0.36
-      plugin_names: ["obstacle_layer", "voxel_layer", "inflation_layer", "social_layer"]
+      plugin_names: ["obstacle_layer", "voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         inflation_radius: 1.0
@@ -158,7 +158,8 @@ local_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /filtered_scan
+          # topic: /filtered_scan
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True
@@ -222,7 +223,8 @@ global_costmap:
         enabled: True
         observation_sources: scan
         scan:
-          topic: /filtered_scan
+          # topic: /filtered_scan
+          topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True
