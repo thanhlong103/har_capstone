@@ -26,12 +26,16 @@ void SocialLayer::onInitialize() {
   
   current_ = true;
   // START Subscription to topic
-  {
-    auto node_shared_ptr = node_;
-    ppl_sub_ = node_shared_ptr->create_subscription<people_msgs::msg::People>(
-        "/people", rclcpp::SensorDataQoS(),
-        std::bind(&SocialLayer::peopleCallback, this, std::placeholders::_1));
-  }
+  // Subscribe to individual people topic
+  auto node_shared_ptr = node_;
+  ppl_sub_ = node_shared_ptr->create_subscription<people_msgs::msg::People>(
+    "/people", rclcpp::SensorDataQoS(),
+    std::bind(&SocialLayer::peopleCallback, this, std::placeholders::_1));
+
+  // Subscribe to people groups topic
+  group_sub_ = node_shared_ptr->create_subscription<fused_people_msgs::msg::PeopleGroupArray>(
+    "/people_group", rclcpp::SensorDataQoS(),
+    std::bind(&SocialLayer::groupCallback, this, std::placeholders::_1));
 
   rclcpp::Logger logger_ = node_->get_logger();
 
@@ -61,11 +65,11 @@ void SocialLayer::onInitialize() {
   declareParameter("publish_occgrid", rclcpp::ParameterValue(false));
   // In onInitialize() add new parameters
   declareParameter("max_interaction_distance", rclcpp::ParameterValue(10.0));
-  declareParameter("interaction_width", rclcpp::ParameterValue(1.0));
-  declareParameter("interaction_cost", rclcpp::ParameterValue(160));
+  declareParameter("interaction_width", rclcpp::ParameterValue(1.5));
+  declareParameter("interaction_cost", rclcpp::ParameterValue(140));
   declareParameter("interaction_amplitude", rclcpp::ParameterValue(254.0));
   declareParameter("interaction_length_scale", rclcpp::ParameterValue(1.0));
-  declareParameter("interaction_width_scale", rclcpp::ParameterValue(0.3));
+  declareParameter("interaction_width_scale", rclcpp::ParameterValue(0.6));
   get_parameters();
 
   tolerance_vel_still_ = 0.1;
@@ -117,6 +121,12 @@ void SocialLayer::peopleCallback(
   ppl_message_mutex_.unlock();
 }
 
+void SocialLayer::groupCallback(const fused_people_msgs::msg::PeopleGroupArray::SharedPtr msg) {
+  group_message_mutex_.lock();
+  groups_list_ = *msg;
+  group_message_mutex_.unlock();
+}
+
 void SocialLayer::updateBounds(double origin_x, double origin_y,
                                double origin_z, double *min_x, double *min_y,
                                double *max_x, double *max_y) {
@@ -125,7 +135,7 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
       layered_costmap_
           ->getGlobalFrameID(); // Returns the global frame of the costmap
   transformed_people_.clear();  // empty the array
-  int cnt_j = 0;
+  transformed_groups_.clear();
 
   rclcpp::Logger logger_ = node_->get_logger();
 
@@ -164,14 +174,14 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     tpt.velocity.y = opt.point.y - tpt.position.y;
     tpt.velocity.z = opt.point.z - tpt.position.z;
 
-    cnt_j++;
+    // cnt_j++;
     transformed_people_.push_back(
         tpt); // Adds a new element (tpt) at the end of the vector
   }
 
-  std::list<people_msgs::msg::Person>::iterator p_it;
+  // std::list<people_msgs::msg::Person>::iterator p_it;
 
-  for (p_it = transformed_people_.begin(); p_it != transformed_people_.end();
+  for (auto p_it = transformed_people_.begin(); p_it != transformed_people_.end();
        ++p_it) {
     people_msgs::msg::Person person = *p_it;
 
@@ -203,6 +213,54 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     *min_y = std::min(*min_y, person.position.y - greater);
     *max_x = std::max(*max_x, person.position.x + greater);
     *max_y = std::max(*max_y, person.position.y + greater);
+  }
+
+  // Process groups
+  for (const auto& group : groups_list_.groups) {
+    fused_people_msgs::msg::PeopleGroup transformed_group;
+    for (const auto& original_person : group.people) {
+      fused_people_msgs::msg::FusedPerson transformed_person;
+      geometry_msgs::msg::PointStamped gpt, gopt;
+
+      gpt.point = original_person.position.position;
+      gpt.header = groups_list_.header;
+      
+      try {
+        // Transform position
+        tf_->transform(gpt, gopt, global_frame);
+        transformed_person.position.position = gopt.point;
+        
+        // Transform velocity
+        geometry_msgs::msg::Vector3Stamped vel_in, vel_out;
+        vel_in.vector.x = original_person.velocity.x;
+        vel_in.vector.y = original_person.velocity.y;
+        vel_in.vector.z = original_person.velocity.z;
+        vel_in.header = groups_list_.header;
+        tf_->transform(vel_in, vel_out, global_frame);
+        transformed_person.velocity.x = vel_out.vector.x;
+        transformed_person.velocity.y = vel_out.vector.y;
+        transformed_person.velocity.z = vel_out.vector.z;
+        
+        transformed_group.people.push_back(transformed_person);
+      } catch (tf2::TransformException &ex) {
+        RCLCPP_WARN(node_->get_logger(), "TF exception: %s", ex.what());
+      }
+    }
+    
+    if (!transformed_group.people.empty()) {
+      transformed_groups_.push_back(transformed_group);
+    }
+  }
+
+  // Calculate bounds for groups
+  for (const auto& group : transformed_groups_) {
+    for (const auto& person : group.people) {
+      double padding = interaction_width_ * 2.0;
+      *min_x = std::min(*min_x, person.position.position.x - padding);
+      *min_y = std::min(*min_y, person.position.position.y - padding);
+      *max_x = std::max(*max_x, person.position.position.x + padding);
+      *max_y = std::max(*max_y, person.position.position.y + padding);
+    }
   }
 }
 
@@ -368,27 +426,28 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
       }
     }
   }
-  // In updateCosts(), replace the interaction cost application with this:
-  if (transformed_people_.size() >= 2) {
-    // Iterate through all combinations of people
-    for (auto p1_it = transformed_people_.begin(); p1_it != std::prev(transformed_people_.end()); ++p1_it) {
-      for (auto p2_it = std::next(p1_it); p2_it != transformed_people_.end(); ++p2_it) {
-        people_msgs::msg::Person person1 = *p1_it;
-        people_msgs::msg::Person person2 = *p2_it;
+  // Process groups
+  for (const auto& group : transformed_groups_) {
+    if (group.people.size() < 2) continue;
+
+    for (size_t i = 0; i < group.people.size(); ++i) {
+      for (size_t j = i+1; j < group.people.size(); ++j) {
+        const auto& person1 = group.people[i];
+        const auto& person2 = group.people[j];
 
         // Calculate distance between people
-        double dx = person1.position.x - person2.position.x;
-        double dy = person1.position.y - person2.position.y;
+        double dx = person1.position.position.x - person2.position.position.x;
+        double dy = person1.position.position.y - person2.position.position.y;
         double distance = sqrt(dx * dx + dy * dy);
 
         // Skip if people are too far apart
         if (distance > max_interaction_distance_) continue;
 
         // Calculate line segment endpoints
-        double x1 = person1.position.x;
-        double y1 = person1.position.y;
-        double x2 = person2.position.x;
-        double y2 = person2.position.y;
+        double x1 = person1.position.position.x;
+        double y1 = person1.position.position.y;
+        double x2 = person2.position.position.x;
+        double y2 = person2.position.position.y;
 
         // Calculate bounding box for the interaction area
         double padding = interaction_width_ * 2.0; // Add padding for Gaussian drop-off

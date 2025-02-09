@@ -1,15 +1,19 @@
 import rclpy
 from rclpy.node import Node
 from people_msgs.msg import People, Person
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Pose
 from std_msgs.msg import Header
+from fused_people_msgs.msg import PeopleGroupArray, PeopleGroup, FusedPerson  # Assuming correct package
 
 class PeoplePublisher(Node):
     def __init__(self):
         super().__init__('people_publisher')
         
         # Publisher for the People message
-        self.publisher_ = self.create_publisher(People, '/people', 10)
+        self.people_publisher = self.create_publisher(People, '/people', 10)
+        
+        # Publisher for the PeopleGroupArray message
+        self.group_publisher = self.create_publisher(PeopleGroupArray, '/people_group', 10)
 
         # Create a timer to publish data periodically
         self.timer = self.create_timer(1.0, self.publish_people)
@@ -17,61 +21,55 @@ class PeoplePublisher(Node):
         # Initialize the People message
         self.people_msg = People()
         
-        # Create two people (as an example)
+        # Create people data
         self.create_people()
 
     def create_people(self):
-        # Person 1
-        person1 = Person()
-        person1.name = "Person 1"
-        person1.position = Point(x=4.5, y=9.5, z=0.0)
-        person1.velocity = Point(x=1.0, y=-1.0, z=0.0)
-        person1.reliability = 0.95
-        person1.tagnames = ["tag1", "tag2"]
-        person1.tags = ["tag_value_1", "tag_value_2"]
-        
-        # Person 2
-        person2 = Person()
-        person2.name = "Person 2"
-        person2.position = Point(x=6.0, y=10.5, z=0.0)
-        person2.velocity = Point(x=1.0, y=-1.0, z=0.0)
-        person2.reliability = 0.90
-        person2.tagnames = ["tag3", "tag4"]
-        person2.tags = ["tag_value_3", "tag_value_4"]
-
-        # Person 2
-        person3 = Person()
-        person3.name = "Person 2"
-        person3.position = Point(x=6.0, y=9.0, z=0.0)
-        person3.velocity = Point(x=1.0, y=-1.0, z=0.0)
-        person3.reliability = 0.90
-        person3.tagnames = ["tag3", "tag4"]
-        person3 .tags = ["tag_value_3", "tag_value_4"]
-        
-        # Add people to the people message
-        self.people_msg.people = [person1, person2, person3]
+        # Example people
+        self.people_msg.people = [
+            Person(name="Person 1", position=Point(x=4.5, y=9.5, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.95),
+            Person(name="Person 2", position=Point(x=6.0, y=10.5, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.90),
+            Person(name="Person 3", position=Point(x=6.0, y=9.0, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.90),
+            Person(name="Person 4", position=Point(x=5.2, y=8.2, z=0.0), velocity=Point(x=0.1, y=0.1, z=0.0), reliability=0.90)
+        ]
 
     def publish_people(self):
-        # Populate the header (set the timestamp to the current time)
+        # Populate the header
         self.people_msg.header = Header()
         self.people_msg.header.frame_id = "map"
         self.people_msg.header.stamp = self.get_clock().now().to_msg()
 
-        # Log publishing
         self.get_logger().info('Publishing people data')
+        self.people_publisher.publish(self.people_msg)
 
-        # Publish the people data
-        self.publisher_.publish(self.people_msg)
+        # Generate people groups and publish
+        self.publish_people_groups()
+
+    def publish_people_groups(self):
+        group_msg = PeopleGroupArray()
+        group_msg.header = self.people_msg.header
+
+        # Example grouping logic: based on proximity
+        group1 = PeopleGroup(id=1, people=[
+            FusedPerson(position=Pose(position=self.people_msg.people[0].position), velocity=self.people_msg.people[0].velocity, id=101),
+            FusedPerson(position=Pose(position=self.people_msg.people[1].position), velocity=self.people_msg.people[1].velocity, id=102)
+        ])
+        
+        group2 = PeopleGroup(id=2, people=[
+            FusedPerson(position=Pose(position=self.people_msg.people[2].position), velocity=self.people_msg.people[2].velocity, id=103),
+            FusedPerson(position=Pose(position=self.people_msg.people[3].position), velocity=self.people_msg.people[3].velocity, id=104)
+        ])
+
+        group_msg.groups = [group1, group2]
+
+        self.get_logger().info('Publishing people group data')
+        self.group_publisher.publish(group_msg)
+
 
 def main(args=None):
     rclpy.init(args=args)
-
     people_publisher = PeoplePublisher()
-
-    # Spin the node to keep it running and publishing
     rclpy.spin(people_publisher)
-
-    # Shutdown ROS when done
     people_publisher.destroy_node()
     rclpy.shutdown()
 

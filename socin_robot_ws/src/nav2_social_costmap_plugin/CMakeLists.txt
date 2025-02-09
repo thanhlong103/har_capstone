@@ -23,6 +23,7 @@ find_package(rclcpp REQUIRED)
 find_package(nav2_costmap_2d REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(people_msgs REQUIRED)
+find_package(fused_people_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 
 set(dep_pkgs
@@ -30,6 +31,7 @@ set(dep_pkgs
     nav2_costmap_2d
     pluginlib
     people_msgs
+    fused_people_msgs
     nav_msgs)
 
 add_library(${lib_name} SHARED
