@@ -15,9 +15,6 @@ from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 
-# from sklearn.decomposition import PCA
-
-
 class VisionLegTracker(Node):
     def __init__(self):
         super().__init__("vision_leg_tracker_node")
@@ -458,16 +455,6 @@ class VisionLegTracker(Node):
                     int(keypoints_draw[18] * self.HEIGHT),
                 ]
             )
-            # else:
-            #     left_shoulder = (0,0)
-            # if (keypoints_draw[35] > self.confidence_threshold):
-            #     right_hip = tuple([int(keypoints_draw[34]*self.WIDTH), int(keypoints_draw[33]*self.HEIGHT)])
-            # else:
-            #     right_hip = (20,20)
-            # if (keypoints_draw[38] > self.confidence_threshold):
-            #     left_hip = tuple([int(keypoints_draw[37]*self.WIDTH), int(keypoints_draw[36]*self.HEIGHT)])
-            # else:
-            #     left_hip = (0,20)
 
             # Rendering
             self.draw(depth_visual, keypoints_draw, bbox)

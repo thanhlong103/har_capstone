@@ -1,110 +1,92 @@
-import React, { useEffect, useRef } from 'react';
-import ROSLIB from 'roslib';
+import React, { useState } from "react";
+import { Button , Box} from "@mui/material";
+import MapImage from "./sim_map.png"
+import { useNavigate } from "react-router-dom";
 
-const MoveToDestination = () => {
-  const mapContainerRef = useRef(null);
+const MAP_CONFIG = {
+  resolution: 0.05, // meters per pixel
+  origin: [-2.92, -2.72], // map origin (x, y) in meters
+  mapWidth: 575, //in pixel
+  mapHeight: 350,
+};
 
-  useEffect(() => {
-    // Create a connection to the ROS 2 system
-    const ros = new ROSLIB.Ros({
-      url: 'ws://localhost:9090' // Replace with your TurtleBot3 IP address
-    });
+const SendNavGoal = () => {
+  const [goal, setGoal] = useState(null);
+  const navigate = useNavigate();
+  
+  const handleMapClick = (event) => {
+    const img = event.target.getBoundingClientRect();
+    const clickX = event.clientX - img.left;
+    const clickY = event.clientY - img.top;
 
-    ros.on('connection', () => {
-      console.log('Connected to ROS 2 WebSocket');
-    });
+    // Convert pixel coordinates to world coordinates
+    const worldX = MAP_CONFIG.origin[0] + clickX * MAP_CONFIG.resolution;
+    const worldY = MAP_CONFIG.origin[1] + (MAP_CONFIG.mapHeight - clickY) * MAP_CONFIG.resolution;
 
-    ros.on('error', (error) => {
-      console.log('Error connecting to ROS 2:', error);
-    });
+    setGoal({ x: worldX, y: worldY });
+  };
 
-    // Subscribe to the /map topic published by Cartographer
-    const mapTopic = new ROSLIB.Topic({
-      ros: ros,
-      name: '/map',
-      messageType: 'nav_msgs/OccupancyGrid'
-    });
+  const sendGoal = async () => {
+    if (!goal) return alert("Please select a goal on the map!");
 
-    mapTopic.subscribe((message) => {
-      console.log('Received map:', message);
-      // Render the map on the canvas
-      renderMap(message);
-    });
+    // setTimeout(async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/send_goal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(goal),
+        });
 
-    const renderMap = (map) => {
-      const canvas = mapContainerRef.current;
-      const ctx = canvas.getContext('2d');
-      const mapWidth = map.info.width;
-      const mapHeight = map.info.height;
-
-      // Scale map to fit canvas size
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-
-      const scaleX = canvasWidth / mapWidth;
-      const scaleY = canvasHeight / mapHeight;
-
-      // Clear the canvas before drawing
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Create image data for the original map
-      const imageData = ctx.createImageData(mapWidth, mapHeight);
-      for (let i = 0; i < map.data.length; i++) {
-        const value = map.data[i];
-
-        let color;
-        if (value === 100) {
-          color = [0, 0, 0, 255]; // Black for occupied space
-        } else if (value === 0) {
-          color = [255, 255, 255, 255]; // White for free space
-        } else if (value === -1) {
-          color = [192, 192, 192, 255]; // Gray for unknown space
+        const data = await response.json();
+        if (response.ok) {
+          alert(`Goal sent successfully: X=${goal.x}, Y=${goal.y}`);
         } else {
-          color = [255, 255, 255, 255]; // Default to white for unexpected values
+          alert("Failed to send goal: " + data.error);
         }
-
-        const index = i * 4;
-        imageData.data[index] = color[0];
-        imageData.data[index + 1] = color[1];
-        imageData.data[index + 2] = color[2];
-        imageData.data[index + 3] = color[3];
+      } catch (error) {
+        console.error("Error sending goal:", error);
+        alert("Failed to send goal");
       }
-
-      // Create a new image data object for the scaled map
-      const scaledImageData = ctx.createImageData(canvasWidth, canvasHeight);
-
-      // Loop through the canvas pixels and copy from the original image data
-      for (let y = 0; y < canvasHeight; y++) {
-        for (let x = 0; x < canvasWidth; x++) {
-          const mapX = -Math.floor(x / scaleX);
-          const mapY = Math.floor(y / scaleY);
-          const index = (y * canvasWidth + x) * 4;
-          const mapIndex = (mapY * mapWidth + mapX) * 4;
-
-          // Copy the pixel data from the map to the scaled image data
-          scaledImageData.data[index] = imageData.data[mapIndex];
-          scaledImageData.data[index + 1] = imageData.data[mapIndex + 1];
-          scaledImageData.data[index + 2] = imageData.data[mapIndex + 2];
-          scaledImageData.data[index + 3] = imageData.data[mapIndex + 3];
-        }
-      }
-
-      // Draw the scaled image data to the canvas
-      ctx.putImageData(scaledImageData, 0, 0);
-    };
-
-    // Clean up when the component is unmounted
-    return () => {
-      mapTopic.unsubscribe();
-    };
-  }, []);
+    // }, 5000); // Wait 5s before sending
+  };
 
   return (
-    <div>
-      <h1>Move To Destination</h1>
-      <canvas ref={mapContainerRef} width="800" height="800" style={{ border: '1px solid black' }} />
-    </div>
+    <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" height="100vh">
+      <div className="p-6 max-w-lg mx-auto bg-white rounded-xl shadow-md space-y-4">
+        <h1 className="text-xl font-semibold">Select Goal on Map</h1>
+        <div style={{ position: "relative" }}>
+          <img
+            src={MapImage}
+            alt="Map"
+            width={MAP_CONFIG.mapWidth}
+            height={MAP_CONFIG.mapHeight}
+            onClick={handleMapClick}
+            style={{ cursor: "crosshair", border: "2px solid black" }}
+          />
+          {goal && (
+            <div
+              style={{
+                position: "absolute",
+                left: `${(goal.x - MAP_CONFIG.origin[0]) / MAP_CONFIG.resolution}px`,
+                top: `${MAP_CONFIG.mapHeight - (goal.y - MAP_CONFIG.origin[1]) / MAP_CONFIG.resolution}px`,
+                transform: "translate(-50%, -50%)",
+                width: "10px",
+                height: "10px",
+                backgroundColor: "red",
+                borderRadius: "50%",
+              }}
+            ></div>
+          )}
+        </div>
+        <Button variant="contained" color="primary" onClick={sendGoal} fullWidth>
+          Send Goal (Wait 5s)
+        </Button>
+        <Button variant="outlined" color="secondary" onClick={() => navigate("/")} fullWidth>
+          Back to Home
+        </Button>
+      </div>
+    </Box>
   );
 };
 
-export default MoveToDestination;
+export default SendNavGoal;

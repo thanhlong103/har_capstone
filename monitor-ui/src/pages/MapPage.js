@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography , Button} from '@mui/material';
 import ROSLIB from 'roslib';
 import * as d3 from 'd3';
+import { useNavigate } from "react-router-dom";
 
 function MapPage() {
   const [scanData, setScanData] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const ros = new ROSLIB.Ros({
@@ -85,15 +87,14 @@ function MapPage() {
   }, [scanData]);
 
   return (
-    <Box
-      display="flex"
-      flexDirection="column"
-      justifyContent="center"
-      alignItems="center"
-      height="100vh"
-    >
-      <Typography variant="h2">LiDAR Scan</Typography>
+    <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" height="100vh">
+      <Typography variant="h2">LiDAR Scan Streaming</Typography>
       <Box id="scan-visualization" style={{}} justifyContent="center"></Box>
+      <div className="p-6 max-w-md mx-auto bg-white rounded-xl shadow-md space-y-4">
+        <Button variant="outlined" color="secondary" onClick={() => navigate("/")} fullWidth>
+          Back to Home
+        </Button>
+      </div>
     </Box>
   );
 }
