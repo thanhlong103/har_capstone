@@ -88,7 +88,7 @@ class FusedPeopleSubscriber(Node):
                 Point(pt[0], pt[1]).distance(intersection_points[0])
                 for pt in cluster
             ]
-            return np.mean(distances) < self.area_near_threshold
+            return np.mean(distances) < self.area_near_threshold, intersection_points[0], 0
 
         elif len(intersection_points) > 1:
             coords = [(pt.x, pt.y) for pt in intersection_points]
@@ -101,9 +101,9 @@ class FusedPeopleSubscriber(Node):
                     Point(pt[0], pt[1]).distance(centroid)
                     for pt in cluster
                 ]
-                return np.mean(distances) < self.area_near_threshold
+                return np.mean(distances) < self.area_near_threshold, centroid, area
 
-        return False
+        return False, None, None
 
     def create_fused_person(self, person_id, pose):
         person = FusedPerson()
@@ -142,10 +142,18 @@ class FusedPeopleSubscriber(Node):
             people_group = PeopleGroup()
             # people_group.header = Header()
             # people_group.header.stamp = self.get_clock().now().to_msg()
-            people_group.header.frame_id = "base_laser"
+            # people_group.header.frame_id = "base_laser"
+
+            isGroup, interest_point, area = self.detect_group(cluster)
+
+            print(interest_point)
 
             # Check if the group is valid
-            if self.detect_group(cluster):
+            if isGroup:
+                people_group.centroid.x = interest_point.x
+                people_group.centroid.y = interest_point.y
+                people_group.area = area
+
                 # Extract members of this group
                 group_indices = np.where(labels == group_id)[0]
 
