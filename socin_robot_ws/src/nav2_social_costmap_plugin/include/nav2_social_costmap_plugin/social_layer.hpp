@@ -37,6 +37,8 @@ protected:
   double interaction_amplitude_;
   double interaction_length_scale_;
   double interaction_width_scale_;
+  double centroid_amplitude_;
+  double centroid_scale_;
   
 public:
   SocialLayer() { layered_costmap_ = NULL; }
@@ -72,6 +74,10 @@ private:
 
   void peopleCallback(const people_msgs::msg::People::SharedPtr msg);
   void groupCallback(const fused_people_msgs::msg::PeopleGroupArray::SharedPtr msg);
+
+  void applyCentroidGaussian(const geometry_msgs::msg::Point& centroid, nav2_costmap_2d::Costmap2D* costmap);
+
+  void connectToCentroid(const geometry_msgs::msg::Point& person_pos, const geometry_msgs::msg::Point& centroid, nav2_costmap_2d::Costmap2D* costmap);
 
   std::mutex ppl_message_mutex_;
   rclcpp::Subscription<people_msgs::msg::People>::SharedPtr ppl_sub_;

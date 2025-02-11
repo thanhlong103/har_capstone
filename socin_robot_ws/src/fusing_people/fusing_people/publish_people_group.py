@@ -24,7 +24,7 @@ class GroupPublisher(Node):
         self.num_people = num_people
 
     def publish_group(self):
-        center_x, center_y = 0.0, 0.0  # Center point
+        center_x, center_y = 4.0, 5.0  # Center point
         radius = 1.0  # Distance from center
         
         people_positions = [
@@ -50,6 +50,8 @@ class GroupPublisher(Node):
             person.position.position.x = px
             person.position.position.y = py
             person.position.position.z = 0.0
+            person.velocity.x = 1.0
+            person.velocity.y = 1.0
             
             yaw = calculate_facing_orientation(px, py, center_x, center_y)
             person.position.orientation.z = math.sin(yaw / 2.0)

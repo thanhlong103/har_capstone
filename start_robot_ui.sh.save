@@ -1,3 +1,0 @@
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml
-cd /home/ntlong/har_capstone/monitor-ui && npm start
-cd /home/ntlong/har_capstone/monitor_ui/src && node server.js

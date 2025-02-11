@@ -135,8 +135,7 @@ class FusedPeopleSubscriber(Node):
 
         people_group_array = PeopleGroupArray()
         people_group_array.header = Header()
-        people_group_array.header.stamp = self.get_clock().now().to_msg()
-        people_group_array.header.frame_id = "base_laser"
+        people_group_array.header.frame_id = "laser_frame"
 
         for group_id, cluster in groups.items():
             people_group = PeopleGroup()

@@ -13,7 +13,7 @@ class PeoplePublisher(Node):
         self.people_publisher = self.create_publisher(People, '/people', 10)
         
         # Publisher for the PeopleGroupArray message
-        self.group_publisher = self.create_publisher(PeopleGroupArray, '/people_group', 10)
+        self.group_publisher = self.create_publisher(PeopleGroupArray, '/people_groups', 10)
 
         # Create a timer to publish data periodically
         self.timer = self.create_timer(1.0, self.publish_people)
@@ -28,9 +28,9 @@ class PeoplePublisher(Node):
         # Example people
         self.people_msg.people = [
             Person(name="Person 1", position=Point(x=4.5, y=9.5, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.95),
-            Person(name="Person 2", position=Point(x=6.0, y=10.5, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.90),
-            Person(name="Person 3", position=Point(x=6.0, y=9.0, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.90),
-            Person(name="Person 4", position=Point(x=5.2, y=8.2, z=0.0), velocity=Point(x=0.1, y=0.1, z=0.0), reliability=0.90)
+            Person(name="Person 2", position=Point(x=6.0, y=10.5, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.90)
+            # Person(name="Person 3", position=Point(x=6.0, y=9.0, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.90),
+            # Person(name="Person 4", position=Point(x=5.2, y=8.2, z=0.0), velocity=Point(x=0.1, y=0.1, z=0.0), reliability=0.90)
         ]
 
     def publish_people(self):
@@ -53,14 +53,14 @@ class PeoplePublisher(Node):
         group1 = PeopleGroup(id=1, people=[
             FusedPerson(position=Pose(position=self.people_msg.people[0].position), velocity=self.people_msg.people[0].velocity, id=101),
             FusedPerson(position=Pose(position=self.people_msg.people[1].position), velocity=self.people_msg.people[1].velocity, id=102)
-        ])
+        ], centroid=Point(x=5.0, y= 8.5))
         
-        group2 = PeopleGroup(id=2, people=[
-            FusedPerson(position=Pose(position=self.people_msg.people[2].position), velocity=self.people_msg.people[2].velocity, id=103),
-            FusedPerson(position=Pose(position=self.people_msg.people[3].position), velocity=self.people_msg.people[3].velocity, id=104)
-        ])
+        # group2 = PeopleGroup(id=2, people=[
+        #     FusedPerson(position=Pose(position=self.people_msg.people[2].position), velocity=self.people_msg.people[2].velocity, id=103),
+        #     FusedPerson(position=Pose(position=self.people_msg.people[3].position), velocity=self.people_msg.people[3].velocity, id=104)
+        # ], centroid=Point(x=5.0, y= 8.5))
 
-        group_msg.groups = [group1, group2]
+        group_msg.groups = [group1]
 
         self.get_logger().info('Publishing people group data')
         self.group_publisher.publish(group_msg)

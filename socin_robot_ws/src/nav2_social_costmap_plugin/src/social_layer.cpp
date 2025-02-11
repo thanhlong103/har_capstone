@@ -34,7 +34,7 @@ void SocialLayer::onInitialize() {
 
   // Subscribe to people groups topic
   group_sub_ = node_shared_ptr->create_subscription<fused_people_msgs::msg::PeopleGroupArray>(
-    "/people_group", rclcpp::SensorDataQoS(),
+    "/people_groups", rclcpp::SensorDataQoS(),
     std::bind(&SocialLayer::groupCallback, this, std::placeholders::_1));
 
   rclcpp::Logger logger_ = node_->get_logger();
@@ -63,13 +63,15 @@ void SocialLayer::onInitialize() {
   // Factor with which to scale the velocity [1-10]
   declareParameter("speed_factor_multiplier", rclcpp::ParameterValue(5.0));
   declareParameter("publish_occgrid", rclcpp::ParameterValue(false));
-  // In onInitialize() add new parameters
+  // Group Interaction Cost Map Parameters
   declareParameter("max_interaction_distance", rclcpp::ParameterValue(10.0));
   declareParameter("interaction_width", rclcpp::ParameterValue(1.5));
   declareParameter("interaction_cost", rclcpp::ParameterValue(140));
   declareParameter("interaction_amplitude", rclcpp::ParameterValue(254.0));
   declareParameter("interaction_length_scale", rclcpp::ParameterValue(1.0));
   declareParameter("interaction_width_scale", rclcpp::ParameterValue(0.6));
+  declareParameter("centroid_amplitude", rclcpp::ParameterValue(200.0));
+  declareParameter("centroid_scale", rclcpp::ParameterValue(1.0));
   get_parameters();
 
   tolerance_vel_still_ = 0.1;
@@ -112,6 +114,8 @@ void SocialLayer::get_parameters() {
   node_shared_ptr->get_parameter(name_ + "." + "interaction_amplitude", interaction_amplitude_);
   node_shared_ptr->get_parameter(name_ + "." + "interaction_length_scale", interaction_length_scale_);
   node_shared_ptr->get_parameter(name_ + "." + "interaction_width_scale", interaction_width_scale_);
+  node_shared_ptr->get_parameter(name_ + "." + "centroid_amplitude", centroid_amplitude_);
+  node_shared_ptr->get_parameter(name_ + "." + "centroid_scale", centroid_scale_);
 }
 
 void SocialLayer::peopleCallback(
@@ -218,8 +222,23 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
   // Process groups
   for (const auto& group : groups_list_.groups) {
     fused_people_msgs::msg::PeopleGroup transformed_group;
+    // Transform centroid
+    geometry_msgs::msg::PointStamped centroid_pt, transformed_centroid;
+    centroid_pt.header = groups_list_.header;
+    centroid_pt.point = group.centroid;
+
+    try {
+      tf_->transform(centroid_pt, transformed_centroid, global_frame);
+      transformed_group.centroid = transformed_centroid.point;
+    } catch (tf2::TransformException &ex) {
+      RCLCPP_WARN(node_->get_logger(), "Centroid TF exception: %s", ex.what());
+      continue;
+    }
+
     for (const auto& original_person : group.people) {
+
       fused_people_msgs::msg::FusedPerson transformed_person;
+      geometry_msgs::msg::Point centroid;  
       geometry_msgs::msg::PointStamped gpt, gopt;
 
       gpt.point = original_person.position.position;
@@ -249,6 +268,13 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     
     if (!transformed_group.people.empty()) {
       transformed_groups_.push_back(transformed_group);
+
+      // Update bounds for centroid Gaussian
+      double centroid_padding = centroid_scale_ * 3.0;  // 3σ coverage
+      *min_x = std::min(*min_x, transformed_group.centroid.x - centroid_padding);
+      *min_y = std::min(*min_y, transformed_group.centroid.y - centroid_padding);
+      *max_x = std::max(*max_x, transformed_group.centroid.x + centroid_padding);
+      *max_y = std::max(*max_y, transformed_group.centroid.y + centroid_padding);
     }
   }
 
@@ -428,8 +454,15 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
   }
   // Process groups
   for (const auto& group : transformed_groups_) {
+    
     if (group.people.size() < 2) continue;
 
+    applyCentroidGaussian(group.centroid, costmap);
+
+    // Connect each person to centroid
+    for (const auto& person : group.people) {
+      connectToCentroid(person.position.position, group.centroid, costmap);
+    }
     for (size_t i = 0; i < group.people.size(); ++i) {
       for (size_t j = i+1; j < group.people.size(); ++j) {
         const auto& person1 = group.people[i];
@@ -529,6 +562,89 @@ double SocialLayer::gaussian(double x, double y, double x0, double y0, double A,
   double f1 = pow(mx, 2.0) / (2.0 * varx);
   double f2 = pow(my, 2.0) / (2.0 * vary);
   return A * exp(-(f1 + f2));
+}
+
+void SocialLayer::applyCentroidGaussian(const geometry_msgs::msg::Point& centroid,
+                                      nav2_costmap_2d::Costmap2D* costmap) {
+  double res = costmap->getResolution();
+  int size = static_cast<int>((centroid_scale_ ) / res);  // 3σ radius
+  
+  int cx, cy;
+  costmap->worldToMapNoBounds(centroid.x, centroid.y, cx, cy);
+
+  for (int dy = -size; dy <= size; ++dy) {
+    for (int dx = -size; dx <= size; ++dx) {
+      int x = cx + dx;
+      int y = cy + dy;
+      // if (!costmap->inside(x, y)) continue;
+
+      double wx, wy;
+      costmap->mapToWorld(x, y, wx, wy);
+      
+      double dx_w = wx - centroid.x;
+      double dy_w = wy - centroid.y;
+      double dist = sqrt(dx_w*dx_w + dy_w*dy_w);
+      
+      double value = centroid_amplitude_ * exp(-(dist*dist)/(2*centroid_scale_*centroid_scale_));
+      if (value < cutoff_) continue;
+
+      unsigned char new_cost = static_cast<unsigned char>(value);
+      unsigned char old_cost = costmap->getCost(x, y);
+      costmap->setCost(x, y, std::max(old_cost, new_cost));
+    }
+  }
+}
+
+void SocialLayer::connectToCentroid(const geometry_msgs::msg::Point& person_pos,
+                                  const geometry_msgs::msg::Point& centroid,
+                                  nav2_costmap_2d::Costmap2D* costmap) {
+  double res = costmap->getResolution();
+  
+  // Calculate line parameters
+  double x1 = person_pos.x;
+  double y1 = person_pos.y;
+  double x2 = centroid.x;
+  double y2 = centroid.y;
+  
+  // Calculate bounding box with padding
+  double padding = interaction_width_ * 2.0;
+  double min_x = std::min(x1, x2) - padding;
+  double max_x = std::max(x1, x2) + padding;
+  double min_y = std::min(y1, y2) - padding;
+  double max_y = std::max(y1, y2) + padding;
+
+  // Convert to map coordinates
+  int min_i, min_j, max_i, max_j;
+  costmap->worldToMapNoBounds(min_x, min_y, min_i, min_j);
+  costmap->worldToMapNoBounds(max_x, max_y, max_i, max_j);
+
+  // Clamp to costmap bounds
+  min_i = std::max(min_i, 0);
+  min_j = std::max(min_j, 0);
+  max_i = std::min(max_i, static_cast<int>(costmap->getSizeInCellsX())-1);
+  max_j = std::min(max_j, static_cast<int>(costmap->getSizeInCellsY())-1);
+
+  // Process cells
+  for (int j = min_j; j <= max_j; ++j) {
+    for (int i = min_i; i <= max_i; ++i) {
+      double wx, wy;
+      costmap->mapToWorld(i, j, wx, wy);
+
+      double dist = distanceToLineSegment(wx, wy, x1, y1, x2, y2);
+      
+      // Apply line cost with Gaussian falloff
+      if (dist <= interaction_width_) {
+        double gaussian_value = interaction_amplitude_ * 
+          exp(-(dist*dist)/(2*interaction_width_scale_*interaction_width_scale_));
+        
+        if (gaussian_value >= cutoff_) {
+          unsigned char new_cost = static_cast<unsigned char>(gaussian_value);
+          unsigned char old_cost = costmap->getCost(i, j);
+          costmap->setCost(i, j, std::max(old_cost, new_cost));
+        }
+      }
+    }
+  }
 }
 
 double SocialLayer::get_radius(double cutoff, double A, double var) {
