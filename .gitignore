@@ -10,6 +10,8 @@ lidar_leg_tracker_ws/install/
 
 lidar_leg_tracker_ws/log/
 
+ui_launch/node_modules
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
