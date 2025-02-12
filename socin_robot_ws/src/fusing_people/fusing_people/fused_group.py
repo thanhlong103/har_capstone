@@ -96,7 +96,7 @@ class FusedPeopleSubscriber(Node):
                 Point(pt[0], pt[1]).distance(intersection_points[0])
                 for pt in cluster
             ]
-            return np.mean(distances) < self.area_near_threshold, intersection_points[0], 0
+            return np.mean(distances) < self.area_near_threshold, intersection_points[0], 0.0
 
         elif len(intersection_points) > 1:
             coords = [(pt.x, pt.y) for pt in intersection_points]

@@ -468,7 +468,7 @@ class VisionLegTracker(Node):
         lineType = 2
         # print(position)
         cv2.putText(
-            img, label, position, font, fontScale, fontColor, thickness, lineType
+            img, label, (10,30), font, fontScale, fontColor, thickness, lineType
         )
 
     def processImage(self):
@@ -480,7 +480,10 @@ class VisionLegTracker(Node):
         depth_frame = aligned_frames.get_depth_frame()
         color_frame = aligned_frames.get_color_frame()
 
+        color_frame_har = frame.get_color_frame()
+
         img = np.asanyarray(color_frame.get_data())
+        img_har = np.asanyarray(color_frame_har.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
         # img = cv2.medianBlur(img, 3)
@@ -497,6 +500,10 @@ class VisionLegTracker(Node):
 
         keypoints_with_scores = self.estimator(img)
 
+        kp_har = self.estimator(img_har)
+
+        # print(kp_har)
+
         # Localization to get the world coordinates
         person_world_coords = []
         poses = PoseArray()
@@ -505,6 +512,7 @@ class VisionLegTracker(Node):
         for i in range(6):
             bbox = keypoints_with_scores[0][i][51:57]
             keypoints_draw = keypoints_with_scores[0][i][:51]
+            kp_har_detect = kp_har[0][i][:51]
 
             # if (keypoints_draw[17] > self.confidence_threshold):
             right_shoulder = tuple(
@@ -533,7 +541,7 @@ class VisionLegTracker(Node):
             if bbox[4] > self.bbox_threshold:
                 # print(left_shoulder, right_shoulder)
 
-                c_lm = self.make_landmark_timestep(keypoints_draw)
+                c_lm = self.make_landmark_timestep(kp_har_detect)
                 if len(c_lm) > 0:
                     self.lm_list[i].append(c_lm)
                 if len(self.lm_list[i]) == self.n_time_steps:
@@ -543,10 +551,6 @@ class VisionLegTracker(Node):
 
                 if self.label[i] != None:
                     self.draw_class_on_image(self.label[i], img, bbox)
-
-                cv2.rectangle(
-                    img, left_shoulder, right_shoulder, (0, 255, 0), 2
-                )  # Fill with blue
 
                 normal, centroid = self.estimate_plane_pca(keypoints)
 
