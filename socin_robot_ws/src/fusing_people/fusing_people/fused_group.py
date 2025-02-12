@@ -149,6 +149,15 @@ class FusedPeopleSubscriber(Node):
 
             # Check if the group is valid
             if isGroup:
+                activities_list = []
+                for i in group_indices:
+                    person_act = msg.people[i].activity
+                    activities_list.append(person_act)
+                    if i != 0:
+                        if activities_list[i] != activities_list[i-1]:
+                            self.get_logger().info(f"Group {group_id} is not a valid group.")
+                            return
+
                 people_group.centroid.x = interest_point.x
                 people_group.centroid.y = interest_point.y
                 people_group.area = area
@@ -167,6 +176,7 @@ class FusedPeopleSubscriber(Node):
 
                 if group_id == -1:
                     group_id = 10
+                people_group.activity = activities_list[0]
                 people_group.id = int(group_id) 
 
                 self.get_logger().info(f"Group {group_id} detected!")
@@ -178,8 +188,6 @@ class FusedPeopleSubscriber(Node):
         # Publish the PeopleGroupArray message
         self.publisher.publish(people_group_array)
         self.get_logger().info("Published PeopleGroupArray message.")
-
-
 
 def main(args=None):
     rclpy.init(args=args)

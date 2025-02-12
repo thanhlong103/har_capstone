@@ -262,7 +262,6 @@ global_costmap:
         covariance_right_height: 0.3
         covariance_right_width: 0.2
         covariance_when_still: 0.25
-        max_interaction_distance: 10.0
         interaction_width: 1.5
         interaction_cost: 140
         interaction_amplitude: 254.0
@@ -270,6 +269,8 @@ global_costmap:
         interaction_width_scale: 0.6
         centroid_amplitude: 200.0
         centroid_scale: 1.0
+        initial_activity_scale: 1.0
+        walking_phone_scale: 2.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True

@@ -31,7 +31,7 @@ class VisionLegTracker(Node):
         self.i = 0
         self.warmup_frames = 60
 
-        self.cap = cv2.VideoCapture("walking_phone_01_01.mp4")
+        self.cap = cv2.VideoCapture("walking_phone_test.mp4")
 
         # Initialize prevtime for runtime calculation
         self.prevtime = time.time()

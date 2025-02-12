@@ -64,7 +64,6 @@ void SocialLayer::onInitialize() {
   declareParameter("speed_factor_multiplier", rclcpp::ParameterValue(5.0));
   declareParameter("publish_occgrid", rclcpp::ParameterValue(false));
   // Group Interaction Cost Map Parameters
-  declareParameter("max_interaction_distance", rclcpp::ParameterValue(10.0));
   declareParameter("interaction_width", rclcpp::ParameterValue(1.5));
   declareParameter("interaction_cost", rclcpp::ParameterValue(140));
   declareParameter("interaction_amplitude", rclcpp::ParameterValue(254.0));
@@ -72,6 +71,8 @@ void SocialLayer::onInitialize() {
   declareParameter("interaction_width_scale", rclcpp::ParameterValue(0.6));
   declareParameter("centroid_amplitude", rclcpp::ParameterValue(200.0));
   declareParameter("centroid_scale", rclcpp::ParameterValue(1.0));
+  declareParameter("initial_activity_scale", rclcpp::ParameterValue(1.0));
+  declareParameter("walking_phone_scale", rclcpp::ParameterValue(2.0));
   get_parameters();
 
   tolerance_vel_still_ = 0.1;
@@ -108,7 +109,6 @@ void SocialLayer::get_parameters() {
   node_shared_ptr->get_parameter(name_ + "." + "speed_factor_multiplier", speed_factor_);
   node_shared_ptr->get_parameter(name_ + "." + "publish_occgrid", publish_occgrid_);
   // In get_parameters() add
-  node_shared_ptr->get_parameter(name_ + "." + "max_interaction_distance", max_interaction_distance_);
   node_shared_ptr->get_parameter(name_ + "." + "interaction_width", interaction_width_);
   node_shared_ptr->get_parameter(name_ + "." + "interaction_cost", interaction_cost_);
   node_shared_ptr->get_parameter(name_ + "." + "interaction_amplitude", interaction_amplitude_);
@@ -116,6 +116,8 @@ void SocialLayer::get_parameters() {
   node_shared_ptr->get_parameter(name_ + "." + "interaction_width_scale", interaction_width_scale_);
   node_shared_ptr->get_parameter(name_ + "." + "centroid_amplitude", centroid_amplitude_);
   node_shared_ptr->get_parameter(name_ + "." + "centroid_scale", centroid_scale_);
+  node_shared_ptr->get_parameter(name_ + "." + "initial_activity_scale", initial_activity_scale_);
+  node_shared_ptr->get_parameter(name_ + "." + "walking_phone_scale", walking_phone_scale_);
 }
 
 void SocialLayer::peopleCallback(
@@ -168,6 +170,7 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     tpt.pose.position.x = opt.point.x;
     tpt.pose.position.y = opt.point.y;
     tpt.pose.position.z = opt.point.z;
+    tpt.activity = person.activity;
 
     pt.point.x += person.velocity.x;
     pt.point.y += person.velocity.y;
@@ -182,30 +185,33 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     transformed_people_.push_back(
         tpt); // Adds a new element (tpt) at the end of the vector
   }
-
-  // std::list<people_msgs::msg::Person>::iterator p_it;
-
+  
   for (auto p_it = transformed_people_.begin(); p_it != transformed_people_.end();
        ++p_it) {
     people_msgs::msg::Person person = *p_it;
 
+    double scale = initial_activity_scale_;
+    if (person.activity == 3) {
+      scale = walking_phone_scale_;  // Scale factor for phone users
+    }
+
     double mag = sqrt(pow(person.velocity.x, 2) + pow(person.velocity.y, 2));
-    double greater = get_radius(cutoff_, amplitude_, sigma_when_still_);
+    double greater = get_radius(cutoff_, amplitude_, sigma_when_still_ * scale);
     if (mag >= tolerance_vel_still_) {
       double front_height =
-          get_radius(cutoff_, amplitude_, sigma_front_height_);
+          get_radius(cutoff_, amplitude_, sigma_front_height_ * scale);
       if (use_vel_factor_) {
         double factor = 1.0 + mag * speed_factor_;
         front_height =
-            get_radius(cutoff_, amplitude_, sigma_front_height_ * factor);
+            get_radius(cutoff_, amplitude_, sigma_front_height_ * factor *scale);
       }
-      double rear_height = get_radius(cutoff_, amplitude_, sigma_rear_height_);
+      double rear_height = get_radius(cutoff_, amplitude_, sigma_rear_height_ * scale);
 
-      double front_width = get_radius(cutoff_, amplitude_, sigma_front_width_);
-      double rear_width = get_radius(cutoff_, amplitude_, sigma_rear_width_);
+      double front_width = get_radius(cutoff_, amplitude_, sigma_front_width_ * scale);
+      double rear_width = get_radius(cutoff_, amplitude_, sigma_rear_width_ * scale);
       double right_height = 0.0;
       if (use_passing_)
-        right_height = get_radius(cutoff_, amplitude_, sigma_right_height_);
+        right_height = get_radius(cutoff_, amplitude_, sigma_right_height_ * scale);
 
       greater = std::max(
           front_height,
@@ -226,13 +232,20 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     geometry_msgs::msg::PointStamped centroid_pt, transformed_centroid;
     centroid_pt.header = groups_list_.header;
     centroid_pt.point = group.centroid;
+    
 
     try {
       tf_->transform(centroid_pt, transformed_centroid, global_frame);
       transformed_group.centroid = transformed_centroid.point;
+      transformed_group.activity = group.activity;
     } catch (tf2::TransformException &ex) {
       RCLCPP_WARN(node_->get_logger(), "Centroid TF exception: %s", ex.what());
       continue;
+    }
+
+    double scale_group = initial_activity_scale_;
+    if (transformed_group.activity == 3) {
+      scale_group = walking_phone_scale_;  // Scale factor for phone users
     }
 
     for (const auto& original_person : group.people) {
@@ -270,7 +283,7 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
       transformed_groups_.push_back(transformed_group);
 
       // Update bounds for centroid Gaussian
-      double centroid_padding = centroid_scale_ * 3.0;  // 3σ coverage
+      double centroid_padding = centroid_scale_ * 3.0 * scale_group;  // 3σ coverage
       *min_x = std::min(*min_x, transformed_group.centroid.x - centroid_padding);
       *min_y = std::min(*min_y, transformed_group.centroid.y - centroid_padding);
       *max_x = std::max(*max_x, transformed_group.centroid.x + centroid_padding);
@@ -323,11 +336,17 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
   for (p_it = transformed_people_.begin(); p_it != transformed_people_.end();
        ++p_it) {
     people_msgs::msg::Person person = *p_it;
+
+    double scale = initial_activity_scale_;
+    if (person.activity == 3) {
+      scale = walking_phone_scale_;  // Scale factor for phone users
+    }
+    
     double mag = sqrt(person.velocity.x * person.velocity.x +
                       person.velocity.y * person.velocity.y);
     double angle = atan2(person.velocity.y, person.velocity.x);
     double angle_right = angle - 1.57; // 1.51;
-    double radius = get_radius(cutoff_, amplitude_, sigma_when_still_);
+    double radius = get_radius(cutoff_, amplitude_, sigma_when_still_ * scale);
     double front_height = radius;
     double rear_height = radius;
     double greater_side = radius + radius;
@@ -335,17 +354,17 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
       if (use_vel_factor_) {
         double factor = 1.0 + mag * speed_factor_;
         front_height =
-            get_radius(cutoff_, amplitude_, sigma_front_height_ * factor);
+            get_radius(cutoff_, amplitude_, sigma_front_height_ * scale * factor);
       } else
-        front_height = get_radius(cutoff_, amplitude_, sigma_front_height_);
+        front_height = get_radius(cutoff_, amplitude_, sigma_front_height_ * scale);
 
-      rear_height = get_radius(cutoff_, amplitude_, sigma_rear_height_);
+      rear_height = get_radius(cutoff_, amplitude_, sigma_rear_height_ * scale);
 
-      double front_width = get_radius(cutoff_, amplitude_, sigma_front_width_);
-      double rear_width = get_radius(cutoff_, amplitude_, sigma_rear_width_);
+      double front_width = get_radius(cutoff_, amplitude_, sigma_front_width_ * scale);
+      double rear_width = get_radius(cutoff_, amplitude_, sigma_rear_width_ * scale);
       double right_height = 0.0;
       if (use_passing_)
-        right_height = get_radius(cutoff_, amplitude_, sigma_right_height_);
+        right_height = get_radius(cutoff_, amplitude_, sigma_right_height_ * scale);
 
       double height_diameter = std::max(front_height, rear_height) * 2.0;
       double width_diameter =
@@ -410,8 +429,8 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
         double y = by + j * res;
         if (mag < tolerance_vel_still_) {
           // PERSON STANDS STILL
-          a = gaussian(x, y, cx, cy, amplitude_, sigma_when_still_,
-                       sigma_when_still_, 0);
+          a = gaussian(x, y, cx, cy, amplitude_, sigma_when_still_ * scale,
+                       sigma_when_still_ * scale, 0);
         } else {
 
           double ma = atan2(y - cy, x - cx);
@@ -421,8 +440,8 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
             double diff_right =
                 angles::shortest_angular_distance(angle_right, ma);
             if (fabs(diff_right) < M_PI / 2) {
-              a_right = gaussian(x, y, cx, cy, amplitude_, sigma_right_height_,
-                                 sigma_right_width_, angle_right);
+              a_right = gaussian(x, y, cx, cy, amplitude_, sigma_right_height_ * scale,
+                                 sigma_right_width_ * scale, angle_right);
             }
           }
           // FRONT
@@ -430,14 +449,14 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
             if (use_vel_factor_) {
               double factor = 1.0 + mag * speed_factor_;
               a = gaussian(x, y, cx, cy, amplitude_,
-                           sigma_front_height_ * factor, sigma_front_width_,
+                           sigma_front_height_  * scale * factor, sigma_front_width_ * scale,
                            angle);
             } else
-              a = gaussian(x, y, cx, cy, amplitude_, sigma_front_height_,
-                           sigma_front_width_, angle);
+              a = gaussian(x, y, cx, cy, amplitude_, sigma_front_height_ * scale,
+                           sigma_front_width_ * scale, angle);
           } else // REAR
-            a = gaussian(x, y, cx, cy, amplitude_, sigma_rear_height_,
-                         sigma_rear_width_,
+            a = gaussian(x, y, cx, cy, amplitude_, sigma_rear_height_ * scale,
+                         sigma_rear_width_ * scale,
                          angle); // 0
 
           a = std::max(a, a_right);
@@ -454,6 +473,14 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
   }
   // Process groups
   for (const auto& group : transformed_groups_) {
+    double scale_group = initial_activity_scale_;
+    if (group.activity == 3) {
+      scale_group = walking_phone_scale_;  // Scale if either person is using phone
+    }
+    
+    // Apply scaled parameters
+    double width = interaction_width_ * scale_group;
+    double width_scale = interaction_width_scale_ * scale_group;
     
     if (group.people.size() < 2) continue;
 
@@ -461,20 +488,12 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
 
     // Connect each person to centroid
     for (const auto& person : group.people) {
-      connectToCentroid(person.pose.position, group.centroid, costmap);
+      connectToCentroid(person.pose.position, group.centroid, costmap, scale_group);
     }
     for (size_t i = 0; i < group.people.size(); ++i) {
       for (size_t j = i+1; j < group.people.size(); ++j) {
         const auto& person1 = group.people[i];
         const auto& person2 = group.people[j];
-
-        // Calculate distance between people
-        double dx = person1.pose.position.x - person2.pose.position.x;
-        double dy = person1.pose.position.y - person2.pose.position.y;
-        double distance = sqrt(dx * dx + dy * dy);
-
-        // Skip if people are too far apart
-        if (distance > max_interaction_distance_) continue;
 
         // Calculate line segment endpoints
         double x1 = person1.pose.position.x;
@@ -483,7 +502,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
         double y2 = person2.pose.position.y;
 
         // Calculate bounding box for the interaction area
-        double padding = interaction_width_ * 2.0; // Add padding for Gaussian drop-off
+        double padding = interaction_width_ * 2.0 * scale_group; // Add padding for Gaussian drop-off
         double min_x = std::min(x1, x2) - padding;
         double max_x = std::max(x1, x2) + padding;
         double min_y = std::min(y1, y2) - padding;
@@ -510,7 +529,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
             double dist = distanceToLineSegment(wx, wy, x1, y1, x2, y2);
 
             // If the cell is on the line, set cost to 254
-            if (dist <= interaction_width_ / 10.0) {
+            if (dist <= interaction_width_ / 15.0) {
               unsigned char old_cost = costmap->getCost(i, j);
               unsigned char new_cost = 254; // Fixed high cost along the line
               costmap->setCost(i, j, std::max(old_cost, new_cost));
@@ -521,7 +540,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
               }
             }
             // If the cell is near the line, apply Gaussian drop-off
-            else if (dist <= interaction_width_) {
+            else if (dist <= interaction_width_ * scale_group) {
               // Calculate Gaussian drop-off based on perpendicular distance
               double gaussian_value = interaction_amplitude_ * exp(-(dist * dist) / (2.0 * interaction_width_scale_ * interaction_width_scale_));
 
@@ -597,7 +616,8 @@ void SocialLayer::applyCentroidGaussian(const geometry_msgs::msg::Point& centroi
 
 void SocialLayer::connectToCentroid(const geometry_msgs::msg::Point& person_pos,
                                   const geometry_msgs::msg::Point& centroid,
-                                  nav2_costmap_2d::Costmap2D* costmap) {
+                                  nav2_costmap_2d::Costmap2D* costmap,
+                                  double& scale) {
   double res = costmap->getResolution();
   
   // Calculate line parameters
@@ -607,7 +627,7 @@ void SocialLayer::connectToCentroid(const geometry_msgs::msg::Point& person_pos,
   double y2 = centroid.y;
   
   // Calculate bounding box with padding
-  double padding = interaction_width_ * 2.0;
+  double padding = interaction_width_ * 2.0 * scale;
   double min_x = std::min(x1, x2) - padding;
   double max_x = std::max(x1, x2) + padding;
   double min_y = std::min(y1, y2) - padding;
@@ -635,7 +655,7 @@ void SocialLayer::connectToCentroid(const geometry_msgs::msg::Point& person_pos,
       // Apply line cost with Gaussian falloff
       if (dist <= interaction_width_) {
         double gaussian_value = interaction_amplitude_ * 
-          exp(-(dist*dist)/(2*interaction_width_scale_*interaction_width_scale_));
+          exp(-(dist*dist)/(2*interaction_width_scale_ * scale * interaction_width_scale_ * scale));
         
         if (gaussian_value >= cutoff_) {
           unsigned char new_cost = static_cast<unsigned char>(gaussian_value);

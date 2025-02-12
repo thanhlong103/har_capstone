@@ -30,14 +30,17 @@ class PeoplePublisher(Node):
             Person(
                 pose=Pose(position=Point(x=5.0, y=9.5, z=0.0)),  # Corrected
                 velocity=Point(x=1.0, y=-0.8, z=0.0),
+                activity = 3,
             ),
             Person(
                 pose=Pose(position=Point(x=6.0, y=10.5, z=0.0)),  # Corrected
                 velocity=Point(x=1.0, y=-2.0, z=0.0),
+                activity = 3,
             ),
             Person(
                 pose=Pose(position=Point(x=5.5, y=7.5, z=0.0)),  # Corrected
                 velocity=Point(x=0.1, y=0.1, z=0.0),
+                activity = 3,
             )
         ]
 
@@ -62,7 +65,7 @@ class PeoplePublisher(Node):
             Person(pose=self.people_msg.people[0].pose, velocity=self.people_msg.people[0].velocity, id=101),
             Person(pose=self.people_msg.people[1].pose, velocity=self.people_msg.people[1].velocity, id=102),
             Person(pose=self.people_msg.people[2].pose, velocity=self.people_msg.people[2].velocity, id=103)
-        ], centroid=Point(x=7.0, y=7.0))
+        ], centroid=Point(x=7.0, y=7.0), activity = 3)
         
         # group2 = PeopleGroup(id=2, people=[
         #     FusedPerson(position=Pose(position=self.people_msg.people[2].position), velocity=self.people_msg.people[2].velocity, id=103),

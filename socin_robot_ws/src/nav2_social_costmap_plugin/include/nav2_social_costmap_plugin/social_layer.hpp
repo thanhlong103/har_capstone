@@ -30,7 +30,6 @@ class SocialLayer : public nav2_costmap_2d::CostmapLayer {
 // Add to SocialLayer class declaration in social_layer.hpp
 protected:
   // Interaction parameters
-  double max_interaction_distance_;
   double interaction_width_;
   unsigned char interaction_cost_;
   double interaction_amplitude_;
@@ -38,6 +37,8 @@ protected:
   double interaction_width_scale_;
   double centroid_amplitude_;
   double centroid_scale_;
+  double initial_activity_scale_;
+  double walking_phone_scale_;
   
 public:
   SocialLayer() { layered_costmap_ = NULL; }
@@ -76,7 +77,7 @@ private:
 
   void applyCentroidGaussian(const geometry_msgs::msg::Point& centroid, nav2_costmap_2d::Costmap2D* costmap);
 
-  void connectToCentroid(const geometry_msgs::msg::Point& person_pos, const geometry_msgs::msg::Point& centroid, nav2_costmap_2d::Costmap2D* costmap);
+  void connectToCentroid(const geometry_msgs::msg::Point& person_pos, const geometry_msgs::msg::Point& centroid, nav2_costmap_2d::Costmap2D* costmap, double& scale);
 
   std::mutex ppl_message_mutex_;
   rclcpp::Subscription<people_msgs::msg::People>::SharedPtr ppl_sub_;
