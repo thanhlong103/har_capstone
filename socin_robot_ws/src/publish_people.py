@@ -52,15 +52,17 @@ class PeoplePublisher(Node):
         # Example grouping logic: based on proximity
         group1 = PeopleGroup(id=1, people=[
             FusedPerson(position=Pose(position=self.people_msg.people[0].position), velocity=self.people_msg.people[0].velocity, id=101),
-            FusedPerson(position=Pose(position=self.people_msg.people[1].position), velocity=self.people_msg.people[1].velocity, id=102)
-        ])
-        
-        group2 = PeopleGroup(id=2, people=[
+            FusedPerson(position=Pose(position=self.people_msg.people[1].position), velocity=self.people_msg.people[1].velocity, id=102),
             FusedPerson(position=Pose(position=self.people_msg.people[2].position), velocity=self.people_msg.people[2].velocity, id=103),
             FusedPerson(position=Pose(position=self.people_msg.people[3].position), velocity=self.people_msg.people[3].velocity, id=104)
         ])
+        
+        # group2 = PeopleGroup(id=2, people=[
+        #     FusedPerson(position=Pose(position=self.people_msg.people[2].position), velocity=self.people_msg.people[2].velocity, id=103),
+        #     FusedPerson(position=Pose(position=self.people_msg.people[3].position), velocity=self.people_msg.people[3].velocity, id=104)
+        # ])
 
-        group_msg.groups = [group1, group2]
+        group_msg.groups = [group1]
 
         self.get_logger().info('Publishing people group data')
         self.group_publisher.publish(group_msg)
