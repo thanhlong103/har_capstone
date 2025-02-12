@@ -1,8 +1,9 @@
 import rclpy
 from rclpy.node import Node
 from tf_transformations import euler_from_quaternion
-from people_msgs.msg import People, Person, PeopleGroupArray, PeopleGroup
+from people_msgs.msg import People, MyPerson, PeopleGroupArray, PeopleGroup
 from std_msgs.msg import Header
+from geometry_msgs.msg import Pose, Point, PoseArray
 
 from shapely.geometry import LineString, Point, Polygon
 import numpy as np
@@ -12,9 +13,16 @@ from sklearn.cluster import DBSCAN
 class FusedPeopleSubscriber(Node):
     def __init__(self):
         super().__init__("fused_people_subscriber")
+        # self.subscription = self.create_subscription(
+        #     People,
+        #     "/people_fused",  # Topic name
+        #     self.fused_people_callback,
+        #     10,  # QoS
+        # )
+
         self.subscription = self.create_subscription(
-            People,
-            "/people_fused",  # Topic name
+            PoseArray,
+            "/people_vision",  # Topic name
             self.fused_people_callback,
             10,  # QoS
         )
@@ -35,16 +43,16 @@ class FusedPeopleSubscriber(Node):
         self.get_logger().info("Fused People Subscriber Node has started.")
 
     def pose_process(self, pose):
-        qx = pose.pose.orientation.x
-        qy = pose.pose.orientation.y
-        qz = pose.pose.orientation.z
-        qw = pose.pose.orientation.w
+        qx = pose.orientation.x
+        qy = pose.orientation.y
+        qz = pose.orientation.z
+        qw = pose.orientation.w
 
         # Convert quaternion to Euler angles (roll, pitch, yaw)
         _, _, orientation = euler_from_quaternion([qx, qy, qz, qw])
 
-        x = pose.pose.position.x
-        y = pose.pose.position.y
+        x = pose.position.x
+        y = pose.position.y
 
         return [x, y, orientation]
 
@@ -95,6 +103,8 @@ class FusedPeopleSubscriber(Node):
             polygon = Polygon(coords).convex_hull
             area = polygon.area
 
+            print(coords)
+
             if area < self.interest_area:
                 centroid = polygon.centroid
                 distances = [
@@ -106,7 +116,7 @@ class FusedPeopleSubscriber(Node):
         return False, None, None
 
     def create_fused_person(self, person_id, pose):
-        person = Person()
+        person = MyPerson()
         person.id = person_id
         person.pose.position.x = pose[0]
         person.pose.position.y = pose[1]
@@ -118,12 +128,14 @@ class FusedPeopleSubscriber(Node):
         """
         Callback to process data from /people_fused and publish grouped data.
         """
-        if not msg.people:
+        if not msg:
             self.get_logger().info("No people detected in the /people_fused topic.")
             return
 
-        self.pose_array = [self.pose_process(pose) for pose in msg.people]
+        self.pose_array = [self.pose_process(pose) for pose in msg.poses]
         self.pose_array = np.array(self.pose_array)
+
+        print(self.pose_array)
 
         # DBSCAN clustering
         labels = self.dbscan.fit_predict(self.pose_array)
@@ -149,14 +161,14 @@ class FusedPeopleSubscriber(Node):
 
             # Check if the group is valid
             if isGroup:
-                activities_list = []
-                for i in group_indices:
-                    person_act = msg.people[i].activity
-                    activities_list.append(person_act)
-                    if i != 0:
-                        if activities_list[i] != activities_list[i-1]:
-                            self.get_logger().info(f"Group {group_id} is not a valid group.")
-                            return
+                # activities_list = []
+                # for i in group_indices:
+                #     person_act = msg.people[i].activity
+                #     activities_list.append(person_act)
+                #     if i != 0:
+                #         if activities_list[i] != activities_list[i-1]:
+                #             self.get_logger().info(f"Group {group_id} is not a valid group.")
+                #             return
 
                 people_group.centroid.x = interest_point.x
                 people_group.centroid.y = interest_point.y
@@ -167,16 +179,16 @@ class FusedPeopleSubscriber(Node):
 
                 # Populate the group with FusedPerson data
                 for idx in group_indices:
-                    person = msg.people[idx]
-                    fused_person = Person()
-                    fused_person.id = person.id
-                    fused_person.pose = person.pose
-                    fused_person.velocity = person.velocity
+                    person = msg.poses[idx]
+                    fused_person = MyPerson()
+                    # fused_person.id = person.id
+                    fused_person.pose = person
+                    # fused_person.velocity = person.velocity
                     people_group.people.append(fused_person)
 
                 if group_id == -1:
                     group_id = 10
-                people_group.activity = activities_list[0]
+                # people_group.activity = activities_list[0]
                 people_group.id = int(group_id) 
 
                 self.get_logger().info(f"Group {group_id} detected!")

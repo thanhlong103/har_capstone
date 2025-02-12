@@ -236,7 +236,7 @@ class VisionLegTracker(Node):
         lineType = 2
         # print(position)
         cv2.putText(
-            img, label, (10,10), font, fontScale, fontColor, thickness, lineType
+            img, label, (10,30), font, fontScale, fontColor, thickness, lineType
         )
 
     def processImage(self):

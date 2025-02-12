@@ -146,8 +146,8 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
   rclcpp::Logger logger_ = node_->get_logger();
 
   for (unsigned int i = 0; i < people_list_.people.size(); i++) {
-    people_msgs::msg::Person &person = people_list_.people[i];
-    people_msgs::msg::Person tpt;
+    people_msgs::msg::MyPerson &person = people_list_.people[i];
+    people_msgs::msg::MyPerson tpt;
     geometry_msgs::msg::PointStamped pt, opt;
 
     pt.point.x = person.pose.position.x;
@@ -188,7 +188,7 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
   
   for (auto p_it = transformed_people_.begin(); p_it != transformed_people_.end();
        ++p_it) {
-    people_msgs::msg::Person person = *p_it;
+    people_msgs::msg::MyPerson person = *p_it;
 
     double scale = initial_activity_scale_;
     if (person.activity == 3) {
@@ -250,7 +250,7 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
 
     for (const auto& original_person : group.people) {
 
-      people_msgs::msg::Person transformed_person;
+      people_msgs::msg::MyPerson transformed_person;
       geometry_msgs::msg::Point centroid;  
       geometry_msgs::msg::PointStamped gpt, gopt;
 
@@ -316,7 +316,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
 
   get_parameters();
 
-  std::list<people_msgs::msg::Person>::iterator p_it;
+  std::list<people_msgs::msg::MyPerson>::iterator p_it;
   nav2_costmap_2d::Costmap2D *costmap = layered_costmap_->getCostmap();
   double res = costmap->getResolution();
 
@@ -335,7 +335,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
 
   for (p_it = transformed_people_.begin(); p_it != transformed_people_.end();
        ++p_it) {
-    people_msgs::msg::Person person = *p_it;
+    people_msgs::msg::MyPerson person = *p_it;
 
     double scale = initial_activity_scale_;
     if (person.activity == 3) {
@@ -540,7 +540,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
               }
             }
             // If the cell is near the line, apply Gaussian drop-off
-            else if (dist <= interaction_width_ * scale_group) {
+            else if (dist <= interaction_width_) {
               // Calculate Gaussian drop-off based on perpendicular distance
               double gaussian_value = interaction_amplitude_ * exp(-(dist * dist) / (2.0 * interaction_width_scale_ * interaction_width_scale_));
 

@@ -2,8 +2,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Header
 from geometry_msgs.msg import Pose, Point
-from people_msgs.msg import People, Person
-from fused_people_msgs.msg import FusedPersonArray, FusedPerson  # Replace with actual package name
+from people_msgs.msg import People, MyPerson
 import tf2_ros
 import tf_transformations
 import numpy as np
@@ -17,7 +16,7 @@ class PeopleFusedConverter(Node):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
         self.subscription = self.create_subscription(
-            FusedPersonArray,
+            People,
             '/people_fused',
             self.people_fused_callback,
             10)

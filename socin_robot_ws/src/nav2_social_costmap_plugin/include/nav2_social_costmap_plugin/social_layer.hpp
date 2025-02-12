@@ -14,7 +14,7 @@
 //#include "ppl_interface/msg/AddressBook.hpp"
 
 #include "people_msgs/msg/people.hpp"
-#include "people_msgs/msg/person.hpp"
+#include "people_msgs/msg/my_person.hpp"
 #include "people_msgs/msg/people_group_array.hpp"
 #include "people_msgs/msg/people_group.hpp"
 
@@ -62,8 +62,8 @@ public:
   // Helper function
   double distanceToLineSegment(double x, double y, double x1, double y1, double x2, double y2);
   double distanceToMergedRegion(double wx, double wy, const std::vector<geometry_msgs::msg::Point>& hull);
-  std::vector<std::vector<people_msgs::msg::Person>> clusterPeople(const std::list<people_msgs::msg::Person>& people,double max_group_distance);
-  std::vector<geometry_msgs::msg::Point> computeConvexHull(const std::vector<people_msgs::msg::Person>& group);
+  std::vector<std::vector<people_msgs::msg::MyPerson>> clusterPeople(const std::list<people_msgs::msg::MyPerson>& people,double max_group_distance);
+  std::vector<geometry_msgs::msg::Point> computeConvexHull(const std::vector<people_msgs::msg::MyPerson>& group);
 
 private:
   void get_parameters();
@@ -95,7 +95,7 @@ private:
 
   people_msgs::msg::People people_list_;
   people_msgs::msg::PeopleGroupArray groups_list_;
-  std::list<people_msgs::msg::Person> transformed_people_;
+  std::list<people_msgs::msg::MyPerson> transformed_people_;
   std::list<people_msgs::msg::PeopleGroup> transformed_groups_;
 
   bool publish_occgrid_;
