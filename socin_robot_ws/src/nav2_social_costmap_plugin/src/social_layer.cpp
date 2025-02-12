@@ -33,7 +33,7 @@ void SocialLayer::onInitialize() {
     std::bind(&SocialLayer::peopleCallback, this, std::placeholders::_1));
 
   // Subscribe to people groups topic
-  group_sub_ = node_shared_ptr->create_subscription<fused_people_msgs::msg::PeopleGroupArray>(
+  group_sub_ = node_shared_ptr->create_subscription<people_msgs::msg::PeopleGroupArray>(
     "/people_groups", rclcpp::SensorDataQoS(),
     std::bind(&SocialLayer::groupCallback, this, std::placeholders::_1));
 
@@ -125,7 +125,7 @@ void SocialLayer::peopleCallback(
   ppl_message_mutex_.unlock();
 }
 
-void SocialLayer::groupCallback(const fused_people_msgs::msg::PeopleGroupArray::SharedPtr msg) {
+void SocialLayer::groupCallback(const people_msgs::msg::PeopleGroupArray::SharedPtr msg) {
   group_message_mutex_.lock();
   groups_list_ = *msg;
   group_message_mutex_.unlock();
@@ -148,9 +148,9 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     people_msgs::msg::Person tpt;
     geometry_msgs::msg::PointStamped pt, opt;
 
-    pt.point.x = person.position.x;
-    pt.point.y = person.position.y;
-    pt.point.z = person.position.z;
+    pt.point.x = person.pose.position.x;
+    pt.point.y = person.pose.position.y;
+    pt.point.z = person.pose.position.z;
     pt.header.frame_id = people_list_.header.frame_id;
     pt.header.stamp = people_list_.header.stamp;
 
@@ -165,18 +165,18 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     // In general: tf_->transform(in_pose, out_pose, global_frame_,
     // transform_tolerance_);
     tf_->transform(pt, opt, global_frame);
-    tpt.position.x = opt.point.x;
-    tpt.position.y = opt.point.y;
-    tpt.position.z = opt.point.z;
+    tpt.pose.position.x = opt.point.x;
+    tpt.pose.position.y = opt.point.y;
+    tpt.pose.position.z = opt.point.z;
 
     pt.point.x += person.velocity.x;
     pt.point.y += person.velocity.y;
     pt.point.z += person.velocity.z;
     tf_->transform(pt, opt, global_frame);
 
-    tpt.velocity.x = opt.point.x - tpt.position.x;
-    tpt.velocity.y = opt.point.y - tpt.position.y;
-    tpt.velocity.z = opt.point.z - tpt.position.z;
+    tpt.velocity.x = opt.point.x - tpt.pose.position.x;
+    tpt.velocity.y = opt.point.y - tpt.pose.position.y;
+    tpt.velocity.z = opt.point.z - tpt.pose.position.z;
 
     // cnt_j++;
     transformed_people_.push_back(
@@ -213,15 +213,15 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
                    std::max(right_height, std::max(front_width, rear_width))));
     }
 
-    *min_x = std::min(*min_x, person.position.x - greater);
-    *min_y = std::min(*min_y, person.position.y - greater);
-    *max_x = std::max(*max_x, person.position.x + greater);
-    *max_y = std::max(*max_y, person.position.y + greater);
+    *min_x = std::min(*min_x, person.pose.position.x - greater);
+    *min_y = std::min(*min_y, person.pose.position.y - greater);
+    *max_x = std::max(*max_x, person.pose.position.x + greater);
+    *max_y = std::max(*max_y, person.pose.position.y + greater);
   }
 
   // Process groups
   for (const auto& group : groups_list_.groups) {
-    fused_people_msgs::msg::PeopleGroup transformed_group;
+    people_msgs::msg::PeopleGroup transformed_group;
     // Transform centroid
     geometry_msgs::msg::PointStamped centroid_pt, transformed_centroid;
     centroid_pt.header = groups_list_.header;
@@ -237,17 +237,17 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
 
     for (const auto& original_person : group.people) {
 
-      fused_people_msgs::msg::FusedPerson transformed_person;
+      people_msgs::msg::Person transformed_person;
       geometry_msgs::msg::Point centroid;  
       geometry_msgs::msg::PointStamped gpt, gopt;
 
-      gpt.point = original_person.position.position;
+      gpt.point = original_person.pose.position;
       gpt.header = groups_list_.header;
       
       try {
         // Transform position
         tf_->transform(gpt, gopt, global_frame);
-        transformed_person.position.position = gopt.point;
+        transformed_person.pose.position = gopt.point;
         
         // Transform velocity
         geometry_msgs::msg::Vector3Stamped vel_in, vel_out;
@@ -282,10 +282,10 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
   for (const auto& group : transformed_groups_) {
     for (const auto& person : group.people) {
       double padding = interaction_width_ * 2.0;
-      *min_x = std::min(*min_x, person.position.position.x - padding);
-      *min_y = std::min(*min_y, person.position.position.y - padding);
-      *max_x = std::max(*max_x, person.position.position.x + padding);
-      *max_y = std::max(*max_y, person.position.position.y + padding);
+      *min_x = std::min(*min_x, person.pose.position.x - padding);
+      *min_y = std::min(*min_y, person.pose.position.y - padding);
+      *max_x = std::max(*max_x, person.pose.position.x + padding);
+      *max_y = std::max(*max_y, person.pose.position.y + padding);
     }
   }
 }
@@ -358,7 +358,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
     unsigned int height_cells =
         std::max(1, static_cast<int>(greater_side / res));
 
-    double cx = person.position.x, cy = person.position.y;
+    double cx = person.pose.position.x, cy = person.pose.position.y;
 
     double ox, oy;
     if (sin(angle) > 0)
@@ -461,7 +461,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
 
     // Connect each person to centroid
     for (const auto& person : group.people) {
-      connectToCentroid(person.position.position, group.centroid, costmap);
+      connectToCentroid(person.pose.position, group.centroid, costmap);
     }
     for (size_t i = 0; i < group.people.size(); ++i) {
       for (size_t j = i+1; j < group.people.size(); ++j) {
@@ -469,18 +469,18 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
         const auto& person2 = group.people[j];
 
         // Calculate distance between people
-        double dx = person1.position.position.x - person2.position.position.x;
-        double dy = person1.position.position.y - person2.position.position.y;
+        double dx = person1.pose.position.x - person2.pose.position.x;
+        double dy = person1.pose.position.y - person2.pose.position.y;
         double distance = sqrt(dx * dx + dy * dy);
 
         // Skip if people are too far apart
         if (distance > max_interaction_distance_) continue;
 
         // Calculate line segment endpoints
-        double x1 = person1.position.position.x;
-        double y1 = person1.position.position.y;
-        double x2 = person2.position.position.x;
-        double y2 = person2.position.position.y;
+        double x1 = person1.pose.position.x;
+        double y1 = person1.pose.position.y;
+        double x2 = person2.pose.position.x;
+        double y2 = person2.pose.position.y;
 
         // Calculate bounding box for the interaction area
         double padding = interaction_width_ * 2.0; // Add padding for Gaussian drop-off

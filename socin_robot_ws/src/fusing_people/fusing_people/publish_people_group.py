@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, Point, PoseArray
 from std_msgs.msg import Header
-from fused_people_msgs.msg import FusedPerson, FusedPersonArray  # Replace 'custom_msgs' with your actual package name
+from people_msgs.msg import Person, People
 import math
 import random
 
@@ -18,7 +18,7 @@ def calculate_facing_orientation(px, py, cx, cy):
 class GroupPublisher(Node):
     def __init__(self, num_people=3):
         super().__init__('group_facing_publisher')
-        self.publisher_ = self.create_publisher(FusedPersonArray, 'people_fused', 10)
+        self.publisher_ = self.create_publisher(People, 'people_fused', 10)
         self.pose_publisher_ = self.create_publisher(PoseArray, 'fused_people_poses', 10)
         self.timer = self.create_timer(1.0, self.publish_group)
         self.num_people = num_people
@@ -34,7 +34,7 @@ class GroupPublisher(Node):
             ) for i in range(self.num_people)
         ]
         
-        people_array = FusedPersonArray()
+        people_array = People()
         people_array.header = Header()
         people_array.header.stamp = self.get_clock().now().to_msg()
         people_array.header.frame_id = 'laser_frame'
@@ -44,18 +44,18 @@ class GroupPublisher(Node):
         
         people_array.people = []
         for i, (px, py) in enumerate(people_positions):
-            person = FusedPerson()
+            person = Person()
             person.id = i + 1
             
-            person.position.position.x = px
-            person.position.position.y = py
-            person.position.position.z = 0.0
+            person.pose.position.x = px
+            person.pose.position.y = py
+            person.pose.position.z = 0.0
             person.velocity.x = 1.0
             person.velocity.y = 1.0
             
             yaw = calculate_facing_orientation(px, py, center_x, center_y)
-            person.position.orientation.z = math.sin(yaw / 2.0)
-            person.position.orientation.w = math.cos(yaw / 2.0)
+            person.pose.orientation.z = math.sin(yaw / 2.0)
+            person.pose.orientation.w = math.cos(yaw / 2.0)
             
             person.velocity = Point(x=0.0, y=0.0, z=0.0)
 

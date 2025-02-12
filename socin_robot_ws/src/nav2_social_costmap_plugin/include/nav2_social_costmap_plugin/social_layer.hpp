@@ -15,9 +15,8 @@
 
 #include "people_msgs/msg/people.hpp"
 #include "people_msgs/msg/person.hpp"
-#include "fused_people_msgs/msg/people_group_array.hpp"
-#include "fused_people_msgs/msg/people_group.hpp"
-#include "fused_people_msgs/msg/fused_person.hpp"
+#include "people_msgs/msg/people_group_array.hpp"
+#include "people_msgs/msg/people_group.hpp"
 
 #include "nav2_costmap_2d/costmap_2d_publisher.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
@@ -73,7 +72,7 @@ private:
   double get_radius(double cutoff, double A, double var);
 
   void peopleCallback(const people_msgs::msg::People::SharedPtr msg);
-  void groupCallback(const fused_people_msgs::msg::PeopleGroupArray::SharedPtr msg);
+  void groupCallback(const people_msgs::msg::PeopleGroupArray::SharedPtr msg);
 
   void applyCentroidGaussian(const geometry_msgs::msg::Point& centroid, nav2_costmap_2d::Costmap2D* costmap);
 
@@ -82,7 +81,7 @@ private:
   std::mutex ppl_message_mutex_;
   rclcpp::Subscription<people_msgs::msg::People>::SharedPtr ppl_sub_;
   std::mutex group_message_mutex_;
-  rclcpp::Subscription<fused_people_msgs::msg::PeopleGroupArray>::SharedPtr group_sub_;
+  rclcpp::Subscription<people_msgs::msg::PeopleGroupArray>::SharedPtr group_sub_;
 
   // std::unique_ptr<nav2_costmap_2d::Costmap2DPublisher> costmap_pub_;
   // std::shared_ptr<
@@ -94,10 +93,9 @@ private:
   // rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr grid_pub_;
 
   people_msgs::msg::People people_list_;
-  fused_people_msgs::msg::PeopleGroupArray groups_list_;
+  people_msgs::msg::PeopleGroupArray groups_list_;
   std::list<people_msgs::msg::Person> transformed_people_;
-  // std::list<fused_people_msgs::msg::PeopleGroup> transformed_group;
-  std::list<fused_people_msgs::msg::PeopleGroup> transformed_groups_;
+  std::list<people_msgs::msg::PeopleGroup> transformed_groups_;
 
   bool publish_occgrid_;
   bool use_vel_factor_;

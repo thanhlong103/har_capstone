@@ -1,6 +1,4 @@
-string              name
-geometry_msgs/Point position
+geometry_msgs/Pose pose
 geometry_msgs/Point velocity
-float64             reliability
-string[]            tagnames
-string[]            tags
+uint32 activity
+uint32 id

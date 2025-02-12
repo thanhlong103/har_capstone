@@ -12,7 +12,7 @@ import time
 
 # Custom messages
 from leg_detector_msgs.msg import Person, PersonArray, Leg, LegArray
-from fused_people_msgs.msg import FusedPersonArray, FusedPerson
+from people_msgs.msg import People, Person
 
 from pykalman import KalmanFilter
 
@@ -28,10 +28,10 @@ class PersonFusion(Node):
         super().__init__("Kalman_Filter_Node")
         self.create_subscription(PoseArray, "/people_vision", self.vision_callback, 10)
         self.create_subscription(
-            PersonArray, "/people_tracked", self.laser_callback, 10
+            People, "/people_tracked", self.laser_callback, 10
         )
         self.people_fused_pub = self.create_publisher(
-            FusedPersonArray, "/people_fused", 10
+            People, "/people_fused", 10
         )
 
         self.dist_travelled = 0.0
@@ -246,22 +246,23 @@ class PersonFusion(Node):
 
     def publish(self, dict):
         """Publish fused people data"""
-        fused_people_msg = FusedPersonArray()
+        fused_people_msg = People()
         fused_people_msg.header.stamp = self.get_clock().now().to_msg()
         fused_people_msg.header.frame_id = "base_laser"  # Adjust based on your frame of reference
 
         for person_id, person in dict.items():
-            fused_person = FusedPerson()
-            fused_person.position.position.x = person["pos_x"]
-            fused_person.position.position.y = person["pos_y"]
-            fused_person.position.position.z = 0.0
-            fused_person.position.orientation.x = person["orientation_x"]
-            fused_person.position.orientation.y = person["orientation_y"]
-            fused_person.position.orientation.z = person["orientation_z"]
-            fused_person.position.orientation.w = person["orientation_w"]
+            fused_person = Person()
+            fused_person.pose.position.x = person["pos_x"]
+            fused_person.pose.position.y = person["pos_y"]
+            fused_person.pose.position.z = 0.0
+            fused_person.pose.orientation.x = person["orientation_x"]
+            fused_person.pose.orientation.y = person["orientation_y"]
+            fused_person.pose.orientation.z = person["orientation_z"]
+            fused_person.pose.orientation.w = person["orientation_w"]
             fused_person.velocity.x = person["vel_x"]
             fused_person.velocity.y = person["vel_y"]
             fused_person.velocity.z = 0.0
+            fused_person.id = person_id
 
             fused_people_msg.people.append(fused_person)
 

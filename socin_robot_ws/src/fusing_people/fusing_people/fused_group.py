@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from tf_transformations import euler_from_quaternion
-from fused_people_msgs.msg import FusedPersonArray, FusedPerson, PeopleGroupArray, PeopleGroup
+from people_msgs.msg import People, Person, PeopleGroupArray, PeopleGroup
 from std_msgs.msg import Header
 
 from shapely.geometry import LineString, Point, Polygon
@@ -13,7 +13,7 @@ class FusedPeopleSubscriber(Node):
     def __init__(self):
         super().__init__("fused_people_subscriber")
         self.subscription = self.create_subscription(
-            FusedPersonArray,
+            People,
             "/people_fused",  # Topic name
             self.fused_people_callback,
             10,  # QoS
@@ -35,16 +35,16 @@ class FusedPeopleSubscriber(Node):
         self.get_logger().info("Fused People Subscriber Node has started.")
 
     def pose_process(self, pose):
-        qx = pose.position.orientation.x
-        qy = pose.position.orientation.y
-        qz = pose.position.orientation.z
-        qw = pose.position.orientation.w
+        qx = pose.pose.orientation.x
+        qy = pose.pose.orientation.y
+        qz = pose.pose.orientation.z
+        qw = pose.pose.orientation.w
 
         # Convert quaternion to Euler angles (roll, pitch, yaw)
         _, _, orientation = euler_from_quaternion([qx, qy, qz, qw])
 
-        x = pose.position.position.x
-        y = pose.position.position.y
+        x = pose.pose.position.x
+        y = pose.pose.position.y
 
         return [x, y, orientation]
 
@@ -106,10 +106,10 @@ class FusedPeopleSubscriber(Node):
         return False, None, None
 
     def create_fused_person(self, person_id, pose):
-        person = FusedPerson()
+        person = Person()
         person.id = person_id
-        person.position.position.x = pose[0]
-        person.position.position.y = pose[1]
+        person.pose.position.x = pose[0]
+        person.pose.position.y = pose[1]
         person.velocity.x = 0.0  # Default velocity; update if available
         person.velocity.y = 0.0
         return person
@@ -159,9 +159,9 @@ class FusedPeopleSubscriber(Node):
                 # Populate the group with FusedPerson data
                 for idx in group_indices:
                     person = msg.people[idx]
-                    fused_person = FusedPerson()
+                    fused_person = Person()
                     fused_person.id = person.id
-                    fused_person.position = person.position
+                    fused_person.pose = person.pose
                     fused_person.velocity = person.velocity
                     people_group.people.append(fused_person)
 

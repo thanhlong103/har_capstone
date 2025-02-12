@@ -1,5 +1,6 @@
 # People Group
-FusedPerson[] people
+Person[] people
 geometry_msgs/Point centroid
 float32 area
 uint32 id
+uint32 activity
