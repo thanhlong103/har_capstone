@@ -31,7 +31,7 @@ class VisionLegTracker(Node):
         self.i = 0
         self.warmup_frames = 60
 
-        self.cap = cv2.VideoCapture("walking_phone_01_01.mp4")
+        self.cap = cv2.VideoCapture("walking_phone_test.mp4")
 
         # Initialize prevtime for runtime calculation
         self.prevtime = time.time()
@@ -236,7 +236,7 @@ class VisionLegTracker(Node):
         lineType = 2
         # print(position)
         cv2.putText(
-            img, label, (10,10), font, fontScale, fontColor, thickness, lineType
+            img, label, (10,30), font, fontScale, fontColor, thickness, lineType
         )
 
     def processImage(self):

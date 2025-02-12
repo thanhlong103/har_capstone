@@ -1,8 +1,9 @@
 import rclpy
 from rclpy.node import Node
 from tf_transformations import euler_from_quaternion
-from fused_people_msgs.msg import FusedPersonArray, FusedPerson, PeopleGroupArray, PeopleGroup
+from people_msgs.msg import People, MyPerson, PeopleGroupArray, PeopleGroup
 from std_msgs.msg import Header
+from geometry_msgs.msg import Pose, Point, PoseArray
 
 from shapely.geometry import LineString, Point, Polygon
 import numpy as np
@@ -12,9 +13,16 @@ from sklearn.cluster import DBSCAN
 class FusedPeopleSubscriber(Node):
     def __init__(self):
         super().__init__("fused_people_subscriber")
+        # self.subscription = self.create_subscription(
+        #     People,
+        #     "/people_fused",  # Topic name
+        #     self.fused_people_callback,
+        #     10,  # QoS
+        # )
+
         self.subscription = self.create_subscription(
-            FusedPersonArray,
-            "/people_fused",  # Topic name
+            PoseArray,
+            "/people_vision",  # Topic name
             self.fused_people_callback,
             10,  # QoS
         )
@@ -35,16 +43,16 @@ class FusedPeopleSubscriber(Node):
         self.get_logger().info("Fused People Subscriber Node has started.")
 
     def pose_process(self, pose):
-        qx = pose.position.orientation.x
-        qy = pose.position.orientation.y
-        qz = pose.position.orientation.z
-        qw = pose.position.orientation.w
+        qx = pose.orientation.x
+        qy = pose.orientation.y
+        qz = pose.orientation.z
+        qw = pose.orientation.w
 
         # Convert quaternion to Euler angles (roll, pitch, yaw)
         _, _, orientation = euler_from_quaternion([qx, qy, qz, qw])
 
-        x = pose.position.position.x
-        y = pose.position.position.y
+        x = pose.position.x
+        y = pose.position.y
 
         return [x, y, orientation]
 
@@ -88,12 +96,14 @@ class FusedPeopleSubscriber(Node):
                 Point(pt[0], pt[1]).distance(intersection_points[0])
                 for pt in cluster
             ]
-            return np.mean(distances) < self.area_near_threshold, intersection_points[0], 0
+            return np.mean(distances) < self.area_near_threshold, intersection_points[0], 0.0
 
         elif len(intersection_points) > 1:
             coords = [(pt.x, pt.y) for pt in intersection_points]
             polygon = Polygon(coords).convex_hull
             area = polygon.area
+
+            print(coords)
 
             if area < self.interest_area:
                 centroid = polygon.centroid
@@ -106,10 +116,10 @@ class FusedPeopleSubscriber(Node):
         return False, None, None
 
     def create_fused_person(self, person_id, pose):
-        person = FusedPerson()
+        person = MyPerson()
         person.id = person_id
-        person.position.position.x = pose[0]
-        person.position.position.y = pose[1]
+        person.pose.position.x = pose[0]
+        person.pose.position.y = pose[1]
         person.velocity.x = 0.0  # Default velocity; update if available
         person.velocity.y = 0.0
         return person
@@ -118,12 +128,14 @@ class FusedPeopleSubscriber(Node):
         """
         Callback to process data from /people_fused and publish grouped data.
         """
-        if not msg.people:
+        if not msg:
             self.get_logger().info("No people detected in the /people_fused topic.")
             return
 
-        self.pose_array = [self.pose_process(pose) for pose in msg.people]
+        self.pose_array = [self.pose_process(pose) for pose in msg.poses]
         self.pose_array = np.array(self.pose_array)
+
+        print(self.pose_array)
 
         # DBSCAN clustering
         labels = self.dbscan.fit_predict(self.pose_array)
@@ -135,8 +147,7 @@ class FusedPeopleSubscriber(Node):
 
         people_group_array = PeopleGroupArray()
         people_group_array.header = Header()
-        people_group_array.header.stamp = self.get_clock().now().to_msg()
-        people_group_array.header.frame_id = "base_laser"
+        people_group_array.header.frame_id = "laser_frame"
 
         for group_id, cluster in groups.items():
             people_group = PeopleGroup()
@@ -150,6 +161,15 @@ class FusedPeopleSubscriber(Node):
 
             # Check if the group is valid
             if isGroup:
+                # activities_list = []
+                # for i in group_indices:
+                #     person_act = msg.people[i].activity
+                #     activities_list.append(person_act)
+                #     if i != 0:
+                #         if activities_list[i] != activities_list[i-1]:
+                #             self.get_logger().info(f"Group {group_id} is not a valid group.")
+                #             return
+
                 people_group.centroid.x = interest_point.x
                 people_group.centroid.y = interest_point.y
                 people_group.area = area
@@ -159,15 +179,16 @@ class FusedPeopleSubscriber(Node):
 
                 # Populate the group with FusedPerson data
                 for idx in group_indices:
-                    person = msg.people[idx]
-                    fused_person = FusedPerson()
-                    fused_person.id = person.id
-                    fused_person.position = person.position
-                    fused_person.velocity = person.velocity
+                    person = msg.poses[idx]
+                    fused_person = MyPerson()
+                    # fused_person.id = person.id
+                    fused_person.pose = person
+                    # fused_person.velocity = person.velocity
                     people_group.people.append(fused_person)
 
                 if group_id == -1:
                     group_id = 10
+                # people_group.activity = activities_list[0]
                 people_group.id = int(group_id) 
 
                 self.get_logger().info(f"Group {group_id} detected!")
@@ -179,8 +200,6 @@ class FusedPeopleSubscriber(Node):
         # Publish the PeopleGroupArray message
         self.publisher.publish(people_group_array)
         self.get_logger().info("Published PeopleGroupArray message.")
-
-
 
 def main(args=None):
     rclpy.init(args=args)
