@@ -4,6 +4,8 @@ from tf_transformations import euler_from_quaternion
 from people_msgs.msg import People, MyPerson, PeopleGroupArray, PeopleGroup
 from std_msgs.msg import Header
 from geometry_msgs.msg import Pose, Point, PoseArray
+from std_msgs.msg import Float32
+import time
 
 from shapely.geometry import LineString, Point, Polygon
 import numpy as np
@@ -29,6 +31,8 @@ class FusedPeopleSubscriber(Node):
 
         # Publisher for PeopleGroupArray
         self.publisher = self.create_publisher(PeopleGroupArray, "/people_groups", 10)
+
+        self.runtime_publisher = self.create_publisher(Float32, '/group_runtime', 10)
 
         # Apply DBSCAN clustering
         # eps is the maximum distance between two points to be considered as neighbors
@@ -123,6 +127,8 @@ class FusedPeopleSubscriber(Node):
         return person
 
     def fused_people_callback(self, msg):
+
+        start_time = time.time()
         """
         Callback to process data from /people_fused and publish grouped data.
         """
@@ -197,6 +203,15 @@ class FusedPeopleSubscriber(Node):
                 self.get_logger().info(f"Group {group_id} is not a valid group.")
 
             people_group_array.groups.append(people_group)
+
+        runtime = Float32()
+
+        runtime.data = round(time.time() - start_time,2)
+        
+
+        print(runtime)
+
+        self.runtime_publisher.publish(runtime)
 
         # Publish the PeopleGroupArray message
         self.publisher.publish(people_group_array)

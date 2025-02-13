@@ -14,6 +14,7 @@ from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
+from std_msgs.msg import Float32
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -107,6 +108,8 @@ class VisionLegTracker(Node):
             PoseArray, "/people_vision", 10
         )
         self.marker_publisher = self.create_publisher(MarkerArray, "/human_markers", 10)
+
+        self.runtime_publisher = self.create_publisher(Float32, '/tracker_runtime', 10)
 
         # Define the static transform broadcaster
         self.tf_broadcaster = StaticTransformBroadcaster(self)
@@ -541,6 +544,11 @@ class VisionLegTracker(Node):
         # Display FPS
         font = cv2.FONT_HERSHEY_SIMPLEX
         self.new_frame_time = time.time()
+
+        runtime = self.new_frame_time - self.prev_frame_time
+
+        self.runtime_publisher.publish(runtime)
+
         fps = 1 / (self.new_frame_time - self.prev_frame_time)
         self.prev_frame_time = self.new_frame_time
         fps_str = "FPS: " + str(round(fps, 2))
