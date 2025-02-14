@@ -198,11 +198,11 @@ class FusedPeopleSubscriber(Node):
                 # people_group.activity = activities_list[0]
                 people_group.id = int(group_id) 
 
+                people_group_array.groups.append(people_group)
+
                 self.get_logger().info(f"Group {group_id} detected!")
             else:
                 self.get_logger().info(f"Group {group_id} is not a valid group.")
-
-            people_group_array.groups.append(people_group)
 
         runtime = Float32()
 

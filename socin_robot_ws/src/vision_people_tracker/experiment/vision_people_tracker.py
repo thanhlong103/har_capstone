@@ -77,7 +77,7 @@ class VisionLegTracker(Node):
             (14, 16): "c",
         }
 
-        self.input_size = 128
+        self.input_size = 256
 
         self.offset_x = 150.0
         self.offset_y = 37.0
@@ -481,8 +481,16 @@ class VisionLegTracker(Node):
 
                 # print(theta)
 
-                if left_shoulder[0] - right_shoulder[0] > 40:
+                if left_shoulder[0] - right_shoulder[0] > 0:
                     theta = theta + 3.14
+                # elif left_shoulder[0] - right_shoulder[0] < -40:
+                else:
+                    theta = theta
+                # elif (left_shoulder[0] - right_shoulder[0] < 0) & (left_shoulder[0] - right_shoulder[0] >= -40):
+                #     theta = 1.57
+                # else:
+                #     theta = -1.57
+
 
                 x = float(centroid[0])
                 y = float(centroid[1])
@@ -545,7 +553,9 @@ class VisionLegTracker(Node):
         font = cv2.FONT_HERSHEY_SIMPLEX
         self.new_frame_time = time.time()
 
-        runtime = self.new_frame_time - self.prev_frame_time
+        runtime = Float32()
+        
+        runtime.data = self.new_frame_time - self.prev_frame_time
 
         self.runtime_publisher.publish(runtime)
 

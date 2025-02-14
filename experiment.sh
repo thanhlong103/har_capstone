@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export USER=irs
+export USER=ntlong
 
 # =========== LIDAR ==============
 (
@@ -22,19 +22,19 @@ export USER=irs
   ros2 run fusing_people fused_group
 ) &
 
-# Launch the vision_people_tracker
-# (
-#   cd /home/ntlong/har_capstone/socin_robot_ws/src/vision_people_tracker/experiment || exit
-#   source tf/bin/activate
-#   python3 vision_people_tracker.py
-# ) &
-
+Launch the vision_people_tracker
 (
-    cd /home/$USER/har_capstone/socin_robot_ws/src/vision_people_tracker/src || exit
-    python3 publish_people_vision.py
-)&
+  cd /home/ntlong/har_capstone/socin_robot_ws/src/vision_people_tracker/experiment || exit
+  source tf/bin/activate
+  python3 vision_people_tracker.py
+) &
 
-rviz2
+# (
+#     cd /home/$USER/har_capstone/socin_robot_ws/src/vision_people_tracker/src || exit
+#     python3 publish_people_vision.py
+# )&
+
+rviz2 -d /home/$USER/har_capstone/rviz2/group_detection_experiment.rviz
 
 # Wait for all background processes to finish
 

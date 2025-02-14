@@ -66,7 +66,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        {}
+        humans: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -89,9 +89,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 247
+      Max Intensity: 248
       Min Color: 0; 0; 0
-      Min Intensity: 213
+      Min Intensity: 16
       Name: LaserScan
       Position Transformer: XYZ
       Selectable: true
@@ -112,9 +112,11 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        base_laser:
+          Value: true
         base_link:
           Value: true
-        map:
+        camera_frame:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -122,14 +124,18 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        {}
+        base_link:
+          base_laser:
+            {}
+          camera_frame:
+            {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/Marker
       Enabled: true
       Name: Marker
       Namespaces:
-        circle: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -187,9 +193,9 @@ Visualization Manager:
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.7745273113250732
-        Y: 0.6610494256019592
-        Z: -0.47702503204345703
+        X: -0.3200550973415375
+        Y: -2.6318440437316895
+        Z: 0.9175442457199097
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
@@ -198,7 +204,7 @@ Visualization Manager:
       Pitch: 1.0947966575622559
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.0927706956863403
+      Yaw: 1.087770700454712
     Saved: ~
 Window Geometry:
   Displays:

@@ -45,7 +45,7 @@ class CircleMarkerSubscriber(Node):
         self.group_runtime = 0.0
 
         # Open CSV file for logging
-        self.csv_filename = "people_groups_data.csv"
+        self.csv_filename = "people_groups_data_6.csv"
         self.csv_file = open(self.csv_filename, mode='w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
 
@@ -55,7 +55,7 @@ class CircleMarkerSubscriber(Node):
     def tracker_runtime_callback(self, msg):
         """Update tracker runtime value."""
         self.tracker_runtime = msg.data
-
+ 
     def group_runtime_callback(self, msg):
         """Update group runtime value."""
         self.group_runtime = msg.data
