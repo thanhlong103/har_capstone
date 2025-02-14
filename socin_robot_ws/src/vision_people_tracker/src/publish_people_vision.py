@@ -106,7 +106,7 @@ class PeopleVisionPublisher(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    num_people = 4  # Change this number to adjust the number of people
+    num_people = 6  # Change this number to adjust the number of people
     node = PeopleVisionPublisher(num_people=num_people)
     rclpy.spin(node)
     node.destroy_node()

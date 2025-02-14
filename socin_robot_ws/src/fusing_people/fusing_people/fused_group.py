@@ -206,10 +206,7 @@ class FusedPeopleSubscriber(Node):
 
         runtime = Float32()
 
-        runtime.data = round(time.time() - start_time,2)
-        
-
-        print(runtime)
+        runtime.data = round(time.time() - start_time,3)
 
         self.runtime_publisher.publish(runtime)
 

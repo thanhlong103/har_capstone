@@ -6,6 +6,7 @@ from std_msgs.msg import Header, Float32
 import math
 import csv
 import os
+import tf_transformations
 
 # Assuming the /people_groups topic publishes a message with centroid as a Point
 from people_msgs.msg import PeopleGroupArray  # Change this to the actual message type
@@ -49,7 +50,7 @@ class CircleMarkerSubscriber(Node):
         self.csv_writer = csv.writer(self.csv_file)
 
         # Write header to CSV
-        self.csv_writer.writerow(["Timestamp", "Group Index", "Centroid X", "Centroid Y", "Group Radius", "Person Index", "Person X", "Person Y", "Runtime"])
+        self.csv_writer.writerow(["Timestamp", "Group Index", "Interaction Area", "Centroid X", "Centroid Y", "Group Radius", "Person Index", "Person X", "Person Y", "Person Orientation", "Runtime"])
 
     def tracker_runtime_callback(self, msg):
         """Update tracker runtime value."""
@@ -71,12 +72,23 @@ class CircleMarkerSubscriber(Node):
 
             # Save centroid, group radius, and each person's position
             for person_idx, person in enumerate(group.people):
+
+                                # Convert quaternion to yaw
+                quaternion = (
+                    person.pose.orientation.x,
+                    person.pose.orientation.y,
+                    person.pose.orientation.z,
+                    person.pose.orientation.w
+                )
+                _, _, yaw = tf_transformations.euler_from_quaternion(quaternion)
+                person_orientation = math.degrees(yaw)  # Convert radians to degrees
+
                 self.csv_writer.writerow([
-                    timestamp, group_idx, self.centroid.x, self.centroid.y,
-                    group.radius, person_idx, person.pose.position.x, person.pose.position.y, runtime
+                    timestamp, group_idx, group.area, self.centroid.x, self.centroid.y,
+                    group.radius, person_idx, person.pose.position.x, person.pose.position.y, person_orientation, runtime
                 ])
 
-            self.get_logger().info(f"Logged group {group_idx} with centroid at ({self.centroid.x}, {self.centroid.y}, {self.centroid.z})")
+            self.get_logger().info(f"Logged group {group_idx} with centroid at ({self.centroid.x}, {self.centroid.y})")
 
         self.publish_circle_marker()
 

@@ -481,7 +481,7 @@ class VisionLegTracker(Node):
 
                 # print(theta)
 
-                if left_shoulder[0] - right_shoulder[0] > 20:
+                if left_shoulder[0] - right_shoulder[0] > 40:
                     theta = theta + 3.14
 
                 x = float(centroid[0])
@@ -515,14 +515,14 @@ class VisionLegTracker(Node):
         # Add delete markers for people no longer detected
         for prev_id in self.prev_person_marker_ids - current_ids:
             delete_sphere_marker = Marker()
-            delete_sphere_marker.header.frame_id = "base_laser"
+            delete_sphere_marker.header.frame_id = "camera_frame"
             delete_sphere_marker.header.stamp = self.get_clock().now().to_msg()
             delete_sphere_marker.ns = "humans"
             delete_sphere_marker.id = prev_id
             delete_sphere_marker.action = Marker.DELETE
 
             delete_cylinder_marker = Marker()
-            delete_cylinder_marker.header.frame_id = "base_laser"
+            delete_cylinder_marker.header.frame_id = "camera_frame"
             delete_cylinder_marker.header.stamp = self.get_clock().now().to_msg()
             delete_cylinder_marker.ns = "humans"
             delete_cylinder_marker.id = prev_id + 1000
