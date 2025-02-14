@@ -11,10 +11,7 @@ import os
 import pandas as pd
 from matplotlib import pyplot as plt
 
-pipe = rs.pipeline()
-cfg  = rs.config()
 
-cfg.enable_stream(rs.stream.color, 640,480, rs.format.bgr8, 30) 
 
 label = "Warmup...."
 n_time_steps = 10
