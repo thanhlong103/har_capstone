@@ -4,6 +4,8 @@ from tf_transformations import euler_from_quaternion
 from people_msgs.msg import People, MyPerson, PeopleGroupArray, PeopleGroup
 from std_msgs.msg import Header
 from geometry_msgs.msg import Pose, Point, PoseArray
+from std_msgs.msg import Float32
+import time
 
 from shapely.geometry import LineString, Point, Polygon
 import numpy as np
@@ -30,13 +32,15 @@ class FusedPeopleSubscriber(Node):
         # Publisher for PeopleGroupArray
         self.publisher = self.create_publisher(PeopleGroupArray, "/people_groups", 10)
 
+        self.runtime_publisher = self.create_publisher(Float32, '/group_runtime', 10)
+
         # Apply DBSCAN clustering
         # eps is the maximum distance between two points to be considered as neighbors
         # min_samples is the minimum number of points to form a cluster
         self.dbscan = DBSCAN(eps=3.0, min_samples=2)
 
         self.pose_array = []
-        self.line_length = 10.0
+        self.line_length = 20.0
         self.interest_area = 0.5
         self.area_near_threshold = 3.0
 
@@ -96,14 +100,12 @@ class FusedPeopleSubscriber(Node):
                 Point(pt[0], pt[1]).distance(intersection_points[0])
                 for pt in cluster
             ]
-            return np.mean(distances) < self.area_near_threshold, intersection_points[0], 0.0
+            return np.mean(distances) < self.area_near_threshold, intersection_points[0], 0.0, distances[0]/2
 
         elif len(intersection_points) > 1:
             coords = [(pt.x, pt.y) for pt in intersection_points]
             polygon = Polygon(coords).convex_hull
             area = polygon.area
-
-            print(coords)
 
             if area < self.interest_area:
                 centroid = polygon.centroid
@@ -111,9 +113,9 @@ class FusedPeopleSubscriber(Node):
                     Point(pt[0], pt[1]).distance(centroid)
                     for pt in cluster
                 ]
-                return np.mean(distances) < self.area_near_threshold, centroid, area
+                return np.mean(distances) < self.area_near_threshold, centroid, area, distances[0]
 
-        return False, None, None
+        return False, None, None, None
 
     def create_fused_person(self, person_id, pose):
         person = MyPerson()
@@ -125,6 +127,8 @@ class FusedPeopleSubscriber(Node):
         return person
 
     def fused_people_callback(self, msg):
+
+        start_time = time.time()
         """
         Callback to process data from /people_fused and publish grouped data.
         """
@@ -135,7 +139,9 @@ class FusedPeopleSubscriber(Node):
         self.pose_array = [self.pose_process(pose) for pose in msg.poses]
         self.pose_array = np.array(self.pose_array)
 
-        print(self.pose_array)
+        if len(self.pose_array) == 0:
+            self.get_logger().info("No people detected in the /people_fused topic.")
+            return
 
         # DBSCAN clustering
         labels = self.dbscan.fit_predict(self.pose_array)
@@ -155,7 +161,7 @@ class FusedPeopleSubscriber(Node):
             # people_group.header.stamp = self.get_clock().now().to_msg()
             # people_group.header.frame_id = "base_laser"
 
-            isGroup, interest_point, area = self.detect_group(cluster)
+            isGroup, interest_point, area, radius = self.detect_group(cluster)
 
             print(interest_point)
 
@@ -173,6 +179,7 @@ class FusedPeopleSubscriber(Node):
                 people_group.centroid.x = interest_point.x
                 people_group.centroid.y = interest_point.y
                 people_group.area = area
+                people_group.radius = radius
 
                 # Extract members of this group
                 group_indices = np.where(labels == group_id)[0]
@@ -191,11 +198,17 @@ class FusedPeopleSubscriber(Node):
                 # people_group.activity = activities_list[0]
                 people_group.id = int(group_id) 
 
+                people_group_array.groups.append(people_group)
+
                 self.get_logger().info(f"Group {group_id} detected!")
             else:
                 self.get_logger().info(f"Group {group_id} is not a valid group.")
 
-            people_group_array.groups.append(people_group)
+        runtime = Float32()
+
+        runtime.data = round(time.time() - start_time,3)
+
+        self.runtime_publisher.publish(runtime)
 
         # Publish the PeopleGroupArray message
         self.publisher.publish(people_group_array)
