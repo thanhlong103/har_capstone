@@ -12,7 +12,7 @@ import time
 
 # Custom messages
 from leg_detector_msgs.msg import Person, PersonArray, Leg, LegArray
-from fused_people_msgs.msg import FusedPersonArray, FusedPerson
+from people_msgs.msg import People, MyPerson
 
 from pykalman import KalmanFilter
 
@@ -31,7 +31,7 @@ class PersonFusion(Node):
             PersonArray, "/people_tracked", self.laser_callback, 10
         )
         self.people_fused_pub = self.create_publisher(
-            FusedPersonArray, "/people_fused", 10
+            People, "/people_fused", 10
         )
 
         self.dist_travelled = 0.0
@@ -85,8 +85,8 @@ class PersonFusion(Node):
         dict[person_id] = {
             "filtered_state_means": [pos_x, pos_y, 0.0, 0.0],
             "filtered_state_covariances": 0.5 * np.eye(4),
-            "pos_x_vision": pos_x,
-            "pos_y_vision": pos_y,
+            "pos_x": pos_x,
+            "pos_y": pos_y,
             "orientation_x": orientation[0],
             "orientation_y": orientation[1],
             "orientation_z": orientation[2],
@@ -98,7 +98,7 @@ class PersonFusion(Node):
         """Find an existing person within a certain distance threshold"""
         for person_id, data in dict.items():
             distance = np.linalg.norm(
-                [data["pos_x_vision"] - pos_x, data["pos_y_vision"] - pos_y]
+                [data["pos_x"] - pos_x, data["pos_y"] - pos_y]
             )
             if distance < self.pose_threshold:
                 return person_id  # Return existing person's ID if matched
@@ -182,7 +182,7 @@ class PersonFusion(Node):
             if person_id is None:
                 # If not found, create a new person with a unique ID
                 person_id = f"vision_{self.next_id}"
-                self.next_id += 1
+                self.next_id += 10
                 self.add_person(self.vision_people, person_id, pos_x, pos_y, orientation)
 
             # Update the person's position and timestamp
@@ -202,9 +202,7 @@ class PersonFusion(Node):
             person = self.vision_people[person_id]
 
             self.update(self.vision_people, person_id, [person["pos_x"], person["pos_y"]], observation_covariance)
-
-        # print(self.vision_people)
-
+            
         self.remove_stale_people(self.vision_people)  # Remove old detections
         self.publish(self.vision_people)
 
@@ -222,7 +220,7 @@ class PersonFusion(Node):
                 if person_id is None:
                     # If not found, create a new person with a unique ID
                     person_id = f"lidar_{self.next_id}"
-                    self.next_id += 1
+                    self.next_id += 10
                     self.add_person(self.lidar_people, person_id, pos_x, pos_y, [0.0, 0.0, 0.0, 0.0])
 
                 # Update the person's position and timestamp
@@ -246,24 +244,27 @@ class PersonFusion(Node):
 
     def publish(self, dict):
         """Publish fused people data"""
-        fused_people_msg = FusedPersonArray()
+        fused_people_msg = People()
         fused_people_msg.header.stamp = self.get_clock().now().to_msg()
-        fused_people_msg.header.frame_id = "base_laser"  # Adjust based on your frame of reference
+        fused_people_msg.header.frame_id = "map"  # Adjust based on your frame of reference
 
         for person_id, person in dict.items():
-            fused_person = FusedPerson()
-            fused_person.position.position.x = person["pos_x"]
-            fused_person.position.position.y = person["pos_y"]
-            fused_person.position.position.z = 0.0
-            fused_person.position.orientation.x = person["orientation_x"]
-            fused_person.position.orientation.y = person["orientation_y"]
-            fused_person.position.orientation.z = person["orientation_z"]
-            fused_person.position.orientation.w = person["orientation_w"]
+            fused_person = MyPerson()
+            fused_person.pose.position.x = person["pos_x"]
+            fused_person.pose.position.y = person["pos_y"]
+            fused_person.pose.position.z = 0.0
+            fused_person.pose.orientation.x = person["orientation_x"]
+            fused_person.pose.orientation.y = person["orientation_y"]
+            fused_person.pose.orientation.z = person["orientation_z"]
+            fused_person.pose.orientation.w = person["orientation_w"]
             fused_person.velocity.x = person["vel_x"]
             fused_person.velocity.y = person["vel_y"]
             fused_person.velocity.z = 0.0
+            fused_person.id = 0
 
             fused_people_msg.people.append(fused_person)
+
+        print(fused_people_msg)
 
         self.people_fused_pub.publish(fused_people_msg)
 

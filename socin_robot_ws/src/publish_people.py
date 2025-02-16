@@ -1,9 +1,9 @@
 import rclpy
 from rclpy.node import Node
-from people_msgs.msg import People, Person
+from people_msgs.msg import People, MyPerson
 from geometry_msgs.msg import Point, Pose
 from std_msgs.msg import Header
-from fused_people_msgs.msg import PeopleGroupArray, PeopleGroup, FusedPerson  # Assuming correct package
+from people_msgs.msg import PeopleGroupArray, PeopleGroup, MyPerson  # Assuming correct package
 
 class PeoplePublisher(Node):
     def __init__(self):
@@ -13,7 +13,7 @@ class PeoplePublisher(Node):
         self.people_publisher = self.create_publisher(People, '/people', 10)
         
         # Publisher for the PeopleGroupArray message
-        self.group_publisher = self.create_publisher(PeopleGroupArray, '/people_group', 10)
+        self.group_publisher = self.create_publisher(PeopleGroupArray, '/people_groups', 10)
 
         # Create a timer to publish data periodically
         self.timer = self.create_timer(1.0, self.publish_people)
@@ -27,10 +27,21 @@ class PeoplePublisher(Node):
     def create_people(self):
         # Example people
         self.people_msg.people = [
-            Person(name="Person 1", position=Point(x=4.5, y=9.5, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.95),
-            Person(name="Person 2", position=Point(x=6.0, y=10.5, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.90),
-            Person(name="Person 3", position=Point(x=6.0, y=9.0, z=0.0), velocity=Point(x=1.0, y=-1.0, z=0.0), reliability=0.90),
-            Person(name="Person 4", position=Point(x=5.2, y=8.2, z=0.0), velocity=Point(x=0.1, y=0.1, z=0.0), reliability=0.90)
+            MyPerson(
+                pose=Pose(position=Point(x=5.0, y=9.5, z=0.0)),  # Corrected
+                velocity=Point(x=1.0, y=-0.8, z=0.0),
+                activity = 1,
+            ),
+            MyPerson(
+                pose=Pose(position=Point(x=6.0, y=10.5, z=0.0)),  # Corrected
+                velocity=Point(x=1.0, y=-2.0, z=0.0),
+                activity = 1,
+            ),
+            MyPerson(
+                pose=Pose(position=Point(x=5.5, y=7.5, z=0.0)),  # Corrected
+                velocity=Point(x=0.1, y=0.1, z=0.0),
+                activity = 1,
+            )
         ]
 
     def publish_people(self):
@@ -51,16 +62,15 @@ class PeoplePublisher(Node):
 
         # Example grouping logic: based on proximity
         group1 = PeopleGroup(id=1, people=[
-            FusedPerson(position=Pose(position=self.people_msg.people[0].position), velocity=self.people_msg.people[0].velocity, id=101),
-            FusedPerson(position=Pose(position=self.people_msg.people[1].position), velocity=self.people_msg.people[1].velocity, id=102),
-            FusedPerson(position=Pose(position=self.people_msg.people[2].position), velocity=self.people_msg.people[2].velocity, id=103),
-            FusedPerson(position=Pose(position=self.people_msg.people[3].position), velocity=self.people_msg.people[3].velocity, id=104)
-        ])
+            MyPerson(pose=self.people_msg.people[0].pose, velocity=self.people_msg.people[0].velocity, id=101),
+            MyPerson(pose=self.people_msg.people[1].pose, velocity=self.people_msg.people[1].velocity, id=102),
+            MyPerson(pose=self.people_msg.people[2].pose, velocity=self.people_msg.people[2].velocity, id=103)
+        ], centroid=Point(x=7.0, y=7.0), activity = 1)
         
         # group2 = PeopleGroup(id=2, people=[
         #     FusedPerson(position=Pose(position=self.people_msg.people[2].position), velocity=self.people_msg.people[2].velocity, id=103),
         #     FusedPerson(position=Pose(position=self.people_msg.people[3].position), velocity=self.people_msg.people[3].velocity, id=104)
-        # ])
+        # ], centroid=Point(x=5.0, y= 8.5))
 
         group_msg.groups = [group1]
 

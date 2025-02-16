@@ -13,7 +13,7 @@ pipe.start(cfg)
 # Set up video writer for color stream with MP4 format
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use 'mp4v' codec for MP4 format
 current_time = time.strftime("%Y%m%d-%H%M%S")
-color_out = cv2.VideoWriter(f'walking_phone_ztest.mp4', fourcc, 30.0, (640, 480))
+color_out = cv2.VideoWriter(f'ground_truth.mp4', fourcc, 30.0, (640, 480))
 
 try:
     while True:
