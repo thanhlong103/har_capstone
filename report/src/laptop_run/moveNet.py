@@ -9,7 +9,7 @@ label = "Warmup...."
 i = 0
 warmup_frames = 60
 
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+cap = cv2.VideoCapture("/home/irs/har_capstone/socin_robot_ws/src/vision_people_tracker/src/walking_test.mp4", cv2.CAP_DSHOW)
 
 # Initialize prevtime for runtime calculation
 prevtime = time.time()
@@ -133,7 +133,7 @@ def detectEachPerson(keypoints_with_scores, img):
 
 # Load the model interpreter
 try:
-    interpreter = tf.lite.Interpreter(model_path='model/savedModel/MoveNet/1.tflite')
+    interpreter = tf.lite.Interpreter(model_path='1.tflite')
     interpreter.allocate_tensors()
 except:
     print("Can not access the model!")
