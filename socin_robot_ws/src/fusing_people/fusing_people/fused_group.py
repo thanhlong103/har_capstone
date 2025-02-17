@@ -3,7 +3,7 @@ from rclpy.node import Node
 from tf_transformations import euler_from_quaternion
 from people_msgs.msg import People, MyPerson, PeopleGroupArray, PeopleGroup
 from std_msgs.msg import Header
-from geometry_msgs.msg import Pose, Point, PoseArray
+from geometry_msgs.msg import Point
 from std_msgs.msg import Float32
 import time
 
@@ -15,15 +15,9 @@ from sklearn.cluster import DBSCAN
 class FusedPeopleSubscriber(Node):
     def __init__(self):
         super().__init__("fused_people_subscriber")
-        # self.subscription = self.create_subscription(
-        #     People,
-        #     "/people_fused",  # Topic name
-        #     self.fused_people_callback,
-        #     10,  # QoS
-        # )
 
         self.subscription = self.create_subscription(
-            PoseArray,
+            People,
             "/people_vision",  # Topic name
             self.fused_people_callback,
             10,  # QoS
@@ -47,16 +41,16 @@ class FusedPeopleSubscriber(Node):
         self.get_logger().info("Fused People Subscriber Node has started.")
 
     def pose_process(self, pose):
-        qx = pose.orientation.x
-        qy = pose.orientation.y
-        qz = pose.orientation.z
-        qw = pose.orientation.w
+        qx = pose.pose.orientation.x
+        qy = pose.pose.orientation.y
+        qz = pose.pose.orientation.z
+        qw = pose.pose.orientation.w
 
         # Convert quaternion to Euler angles (roll, pitch, yaw)
         _, _, orientation = euler_from_quaternion([qx, qy, qz, qw])
 
-        x = pose.position.x
-        y = pose.position.y
+        x = pose.pose.position.x
+        y = pose.pose.position.y
 
         return [x, y, orientation]
 
@@ -157,9 +151,6 @@ class FusedPeopleSubscriber(Node):
 
         for group_id, cluster in groups.items():
             people_group = PeopleGroup()
-            # people_group.header = Header()
-            # people_group.header.stamp = self.get_clock().now().to_msg()
-            # people_group.header.frame_id = "base_laser"
 
             isGroup, interest_point, area, radius = self.detect_group(cluster)
 
@@ -167,14 +158,14 @@ class FusedPeopleSubscriber(Node):
 
             # Check if the group is valid
             if isGroup:
-                # activities_list = []
-                # for i in group_indices:
-                #     person_act = msg.people[i].activity
-                #     activities_list.append(person_act)
-                #     if i != 0:
-                #         if activities_list[i] != activities_list[i-1]:
-                #             self.get_logger().info(f"Group {group_id} is not a valid group.")
-                #             return
+                activities_list = []
+                for i in group_indices:
+                    person_act = msg.people[i].activity
+                    activities_list.append(person_act)
+                    if i != 0:
+                        if activities_list[i] != activities_list[i-1]:
+                            self.get_logger().info(f"Group {group_id} is not a valid group.")
+                            return
 
                 people_group.centroid.x = interest_point.x
                 people_group.centroid.y = interest_point.y

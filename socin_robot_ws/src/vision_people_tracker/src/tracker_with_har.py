@@ -10,11 +10,13 @@ import time
 import pandas as pd
 import os
 from tf_transformations import quaternion_from_euler
-from geometry_msgs.msg import PoseArray, Pose
+
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
+
+from people_msgs.msg import People, MyPerson
 
 # from sklearn.decomposition import PCA
 
@@ -39,6 +41,7 @@ class VisionLegTracker(Node):
         self.n_time_steps = 10
         self.lm_list = [[], [], [], [], [], []]
         self.label = [None, None, None, None, None, None]
+        self.results = [None, None, None, None, None, None]
         self.prevAct = time.time()
         self.i = 0
         self.warmup_frames = 60
@@ -115,7 +118,7 @@ class VisionLegTracker(Node):
 
         # Add a publisher for person coordinates
         self.coord_publisher = self.create_publisher(
-            PoseArray, "/people_vision_pos", 10
+            People, "/people_vision_pos", 10
         )
         self.marker_publisher = self.create_publisher(MarkerArray, "/human_markers", 10)
 
@@ -456,7 +459,7 @@ class VisionLegTracker(Node):
             label = "RUNNING"
         else:
             label = "WALKING"
-        return label
+        return results, label
     
     def draw_class_on_image(self, label, img, bbox):
         y, x, _ = img.shape
@@ -486,8 +489,6 @@ class VisionLegTracker(Node):
         img_har = np.asanyarray(color_frame_har.get_data())
         depth_image = np.asanyarray(depth_frame.get_data())
 
-        # img = cv2.medianBlur(img, 3)
-
         # Convert depth image to 3-channel grayscale for visualization
         depth_visual = cv2.normalize(
             depth_image, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
@@ -502,11 +503,9 @@ class VisionLegTracker(Node):
 
         kp_har = self.estimator(img_har)
 
-        # print(kp_har)
-
         # Localization to get the world coordinates
         person_world_coords = []
-        poses = PoseArray()
+        poses = People()
         marker_array = MarkerArray()
 
         for i in range(6):
@@ -545,7 +544,8 @@ class VisionLegTracker(Node):
                 if len(c_lm) > 0:
                     self.lm_list[i].append(c_lm)
                 if len(self.lm_list[i]) == self.n_time_steps:
-                    label = self.detectAct(self.lm_list[i])
+                    results, label = self.detectAct(self.lm_list[i])
+                    self.results[i] = results
                     self.label[i] = label
                     self.lm_list[i] = []
 
@@ -568,18 +568,19 @@ class VisionLegTracker(Node):
 
                 person_world_coords.append([x, y, theta])
                 # Add to PoseArray
-                pose = Pose()
-                pose.position.x = x
-                pose.position.y = -y
-                pose.position.z = 0.03
+                pose = MyPerson()
+                pose.pose.position.x = x
+                pose.pose.position.y = -y
+                pose.psoe.position.z = 0.03
                 q = quaternion_from_euler(0, 0, theta + 3.14)
-                pose.orientation.x = q[0]
-                pose.orientation.y = q[1]
-                pose.orientation.z = q[2]
-                pose.orientation.w = q[3]
+                pose.pose.orientation.x = q[0]
+                pose.pose.orientation.y = q[1]
+                pose.pose.orientation.z = q[2]
+                pose.pose.orientation.w = q[3]
+                pose.activity = self.results[i]
 
                 # pose.orientation.z = theta
-                poses.poses.append(pose)
+                poses.people.append(pose)
 
                 marker_array = self.publish_human_marker(marker_array, i, x, y)
 
