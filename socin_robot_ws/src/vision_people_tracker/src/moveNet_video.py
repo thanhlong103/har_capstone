@@ -5,11 +5,9 @@ import pyrealsense2 as rs
 from tensorflow.keras.models import load_model
 import math
 import time
-import os 
-import pandas as pd
-from matplotlib import pyplot as plt
+import csv
 
-cap = cv2.VideoCapture("/home/irs/har_capstone/socin_robot_ws/src/vision_people_tracker/src/walking_test.mp4")
+cap = cv2.VideoCapture("ground_truth.mp4")
 
 label = "Warmup...."
 n_time_steps = 10
@@ -92,7 +90,7 @@ def estimator(frame, interpreter, prevtime):
     currenttime = time.time() 
     keypoints_with_scores = detect(interpreter, image_tensor)
     runtime = currenttime - prevtime
-    print("Runtime: ", runtime)
+    # print("Runtime: ", runtime)
     prevtime = currenttime
 
     return EDGES, keypoints_with_scores, prevtime
@@ -142,41 +140,93 @@ try:
 except:
     print("Can not access the model!")
 
-while True:
+total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+frame_indices = np.linspace(total_frames * 0.3, total_frames - 1, 15, dtype=int)
 
-    ret, img = cap.read()
+print(frame_indices)
 
-    if ret:
+# Define CSV file name
+csv_filename = "keypoints.csv"
 
-        if True:
-            EDGES, keypoints_with_scores, prevtime = estimator(img, interpreter, prevtime)
+current_frame = 0
 
-            detectEachPerson(keypoints_with_scores, img)
+frame_idx = 0 
 
-            # font which we will be using to display FPS 
-            font = cv2.FONT_HERSHEY_SIMPLEX 
+with open(csv_filename, mode='w', newline='') as file:
+    writer = csv.writer(file)
 
-            # time when we finish processing for this frame 
-            new_frame_time = time.time() 
+    # Create header
+    header = ["Frame Index"]
+    for i in range(17):
+        header.extend([f"Point {i+1} X", f"Point {i+1} Y"])
+    writer.writerow(header)
+    while True:
+        ret, img = cap.read()
 
-            fps = 1/(new_frame_time-prev_frame_time) 
-            prev_frame_time = new_frame_time 
-            fps_str = "FPS: " + str(round(fps,2))
+        csv_data = []
 
-            # Update fpsArr and sumfps
-            fpsArr.append(fps)
-            sumfps = sum(fpsArr)
-            fpsAvg = sumfps / len(fpsArr)
+        print("Current Frame: ", current_frame)
 
-            if len(fpsArr) == 10:  # Reset every 10 frames
-                print(f"Avg FPS: {fpsAvg}")
-                fpsArr = []
-                sumfps = 0
+        if ret:
 
-            cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
+            if True:
+                EDGES, keypoints_with_scores, prevtime = estimator(img, interpreter, prevtime)
 
-            cv2.imshow("Image", img)
+                detectEachPerson(keypoints_with_scores, img)
 
-        if cv2.waitKey(1) == ord('q'):
+                keypoints = keypoints_with_scores[0][0][:51]
+
+                if keypoints.shape[0] == 51:
+                    keypoints_k = keypoints.reshape(-1, 3)
+
+                y, x, _ = img.shape
+
+                print(y)
+
+                frame_points = [frame_idx]
+
+                if current_frame == frame_indices[frame_idx]:
+                    for kp in keypoints_k:
+                        ky, kx, kp_conf = kp
+
+                        kx = int(kx*x)
+                        ky = int(ky*y)
+
+                        frame_points.extend([kx, ky])  # Append X, Y coordinates
+
+                    print(frame_points)
+                    writer.writerow(frame_points)
+
+                    frame_idx += 1
+
+                # font which we will be using to display FPS 
+                font = cv2.FONT_HERSHEY_SIMPLEX 
+
+                # time when we finish processing for this frame 
+                new_frame_time = time.time() 
+
+                fps = 1/(new_frame_time-prev_frame_time) 
+                prev_frame_time = new_frame_time 
+                fps_str = "FPS: " + str(round(fps,2))
+
+                # Update fpsArr and sumfps
+                fpsArr.append(fps)
+                sumfps = sum(fpsArr)
+                fpsAvg = sumfps / len(fpsArr)
+
+                if len(fpsArr) == 10:  # Reset every 10 frames
+                    print(f"Avg FPS: {fpsAvg}")
+                    fpsArr = []
+                    sumfps = 0
+
+                cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
+
+                cv2.imshow("Image", img)
+
+            if cv2.waitKey(1) == ord('q'):
+                break
+        current_frame = current_frame + 1
+        if current_frame == total_frames:
             break
+
 cv2.destroyAllWindows()
