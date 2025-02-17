@@ -18,9 +18,6 @@ from visualization_msgs.msg import MarkerArray
 
 from people_msgs.msg import People, MyPerson
 
-# from sklearn.decomposition import PCA
-
-
 class VisionLegTracker(Node):
     def __init__(self):
         super().__init__("HAR_node")
@@ -41,7 +38,7 @@ class VisionLegTracker(Node):
         self.n_time_steps = 10
         self.lm_list = [[], [], [], [], [], []]
         self.label = [None, None, None, None, None, None]
-        self.results = [None, None, None, None, None, None]
+        self.results = [0, 0, 0, 0, 0, 0]
         self.prevAct = time.time()
         self.i = 0
         self.warmup_frames = 60
@@ -105,7 +102,9 @@ class VisionLegTracker(Node):
         # Replace the HAR model loading section with:
         try:
             # Load quantized HAR model
-            self.har_interpreter = tf.lite.Interpreter(model_path="model_quantized_custom.tflite")
+            self.har_interpreter = tf.lite.Interpreter(
+                model_path="model_quantized_custom.tflite"
+            )
             self.har_interpreter.allocate_tensors()
             self.har_input_details = self.har_interpreter.get_input_details()
             self.har_output_details = self.har_interpreter.get_output_details()
@@ -117,9 +116,7 @@ class VisionLegTracker(Node):
         self.get_logger().info("Vision Leg Tracker Node has started.")
 
         # Add a publisher for person coordinates
-        self.coord_publisher = self.create_publisher(
-            People, "/people_vision_pos", 10
-        )
+        self.coord_publisher = self.create_publisher(People, "/people_vision_pos", 10)
         self.marker_publisher = self.create_publisher(MarkerArray, "/human_markers", 10)
 
         # Define the static transform broadcaster
@@ -146,8 +143,8 @@ class VisionLegTracker(Node):
         t.child_frame_id = "camera_frame"  # Camera frame
 
         # Define translation (position) of the camera
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = -0.3
+        t.transform.translation.x = -0.3
+        t.transform.translation.y = 0.0
         t.transform.translation.z = 0.2
 
         # Define rotation (orientation) of the camera
@@ -431,20 +428,14 @@ class VisionLegTracker(Node):
         lm_list = np.expand_dims(lm_list, axis=0)  # Shape: (1, 10, 51)
 
         # Set input tensor
-        self.har_interpreter.set_tensor(
-            self.har_input_details[0]['index'], lm_list
-        )
-        
+        self.har_interpreter.set_tensor(self.har_input_details[0]["index"], lm_list)
+
         # Run inference
         self.har_interpreter.invoke()
-        
-        # Get output
-        output = self.har_interpreter.get_tensor(
-            self.har_output_details[0]['index']
-        )
-        results = np.argmax(output)
 
-        print(output)
+        # Get output
+        output = self.har_interpreter.get_tensor(self.har_output_details[0]["index"])
+        results = np.argmax(output)
 
         # Label handling remains unchanged
         if results == 0:
@@ -460,7 +451,7 @@ class VisionLegTracker(Node):
         else:
             label = "WALKING"
         return results, label
-    
+
     def draw_class_on_image(self, label, img, bbox):
         y, x, _ = img.shape
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -471,8 +462,45 @@ class VisionLegTracker(Node):
         lineType = 2
         # print(position)
         cv2.putText(
-            img, label, (10,30), font, fontScale, fontColor, thickness, lineType
+            img, label, (10, 30), font, fontScale, fontColor, thickness, lineType
         )
+
+    def transform_keypoints(self, keypoints, original_frame, aligned_frame):
+        """
+        Transforms keypoints from the unaligned frame to the aligned frame.
+        Maintains the same keypoints structure and dtype (numpy.float32).
+        """
+
+        # Get intrinsics of both frames
+        intrinsics_orig = (
+            original_frame.get_profile().as_video_stream_profile().intrinsics
+        )
+        intrinsics_aligned = (
+            aligned_frame.get_profile().as_video_stream_profile().intrinsics
+        )
+
+        # Create an empty array with the same shape and dtype
+        transformed_keypoints = np.zeros_like(keypoints, dtype=np.float32)
+
+        for i in range(keypoints.shape[0]):  # Iterate over all persons
+            for j in range(
+                0, keypoints.shape[1], 3
+            ):  # Iterate over keypoints (x, y, confidence)
+                y, x, confidence = (
+                    keypoints[i, j],
+                    keypoints[i, j + 1],
+                    keypoints[i, j + 2],
+                )
+
+                # Convert (x, y) from unaligned to aligned frame
+                aligned_x = x * (intrinsics_aligned.width / intrinsics_orig.width)
+                aligned_y = y * (intrinsics_aligned.height / intrinsics_orig.height)
+
+                transformed_keypoints[i, j] = aligned_y  # Preserve y first
+                transformed_keypoints[i, j + 1] = aligned_x  # Then x
+                transformed_keypoints[i, j + 2] = confidence
+
+        return transformed_keypoints
 
     def processImage(self):
         frame = self.pipe.wait_for_frames()
@@ -497,11 +525,13 @@ class VisionLegTracker(Node):
 
         # Initialize camera intrinsics if not done
         if self.intrinsics is None:
-            self.intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
-
-        keypoints_with_scores = self.estimator(img)
+            self.intrinsics = (
+                aligned_frames.profile.as_video_stream_profile().intrinsics
+            )
 
         kp_har = self.estimator(img_har)
+
+        keypoints_with_scores = self.transform_keypoints(kp_har, frame, aligned_frames)
 
         # Localization to get the world coordinates
         person_world_coords = []
@@ -528,8 +558,8 @@ class VisionLegTracker(Node):
             )
 
             # Rendering
-            self.draw(depth_visual, keypoints_draw, bbox)
-            self.draw(img, keypoints_draw, bbox)
+            self.draw(depth_visual, kp_har_detect, bbox)
+            self.draw(img, kp_har_detect, bbox)
 
             keypoints = self.process_keypoints(
                 self.intrinsics, keypoints_draw, depth_image, depth_frame
@@ -571,25 +601,21 @@ class VisionLegTracker(Node):
                 pose = MyPerson()
                 pose.pose.position.x = x
                 pose.pose.position.y = -y
-                pose.psoe.position.z = 0.03
+                pose.pose.position.z = 0.03
                 q = quaternion_from_euler(0, 0, theta + 3.14)
                 pose.pose.orientation.x = q[0]
                 pose.pose.orientation.y = q[1]
                 pose.pose.orientation.z = q[2]
                 pose.pose.orientation.w = q[3]
-                pose.activity = self.results[i]
+                pose.activity = int(self.results[i])
 
                 # pose.orientation.z = theta
                 poses.people.append(pose)
 
                 marker_array = self.publish_human_marker(marker_array, i, x, y)
 
-                # self.get_logger().info(
-                #     f"Pose -> x: {x:.2f}, y: {y:.2f}, theta: {theta:.2f} rad ({math.degrees(theta):.2f} deg)"
-                # )
-
         # Publish the PoseArray if there are valid coordinates
-        if poses.poses:
+        if poses.people:
             poses.header.frame_id = "camera_frame"  # Replace with your camera frame
             poses.header.stamp = self.get_clock().now().to_msg()
             self.coord_publisher.publish(poses)
