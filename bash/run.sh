@@ -8,11 +8,11 @@
 ) &
 
 #========== ROBOT BRINGUP ============
-(
-  cd /home/ntlong/har_capstone/socin_robot_ws || exit
-  source install/setup.bash
-  ros2 launch turtlebot3_bringup robot.launch.py
-) &
+# (
+#   cd /home/ntlong/har_capstone/socin_robot_ws || exit
+#   source install/setup.bash
+#   ros2 launch turtlebot3_bringup robot.launch.py
+# ) &
 
 #========== FUSING DATA AND GROUP DETECTION ===========
 (
@@ -29,14 +29,16 @@
 
 #========== CAMERA & HAR & TRACKER ============
 (
-  cd /home/ntlong/har_capstone/socin_robot_ws/src/vision_people_tracker/src || exit
+  cd ~/har_capstone/socin_robot_ws || exit
+  source install/setup.bash
+  cd /home/ntlong/har_capstone/socin_robot_ws/src/vision_people_tracker/src 
   source tf/bin/activate
   python3 tracker_with_har.py
 ) &
 
 (
-  cd ~/har_capstone
-  python3 filter_lidar.py || exit
+  cd ~/har_capstone || exit
+  python3 filter_lidar.py 
 ) &
 
 # Launch Rviz2

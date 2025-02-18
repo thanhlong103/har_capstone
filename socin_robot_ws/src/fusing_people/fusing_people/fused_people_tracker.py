@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseArray, Pose
 import std_msgs.msg
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -26,12 +25,12 @@ class PersonFusion(Node):
 
     def __init__(self):
         super().__init__("Kalman_Filter_Node")
-        self.create_subscription(PoseArray, "/people_vision", self.vision_callback, 10)
+        self.create_subscription(People, "/people_vision", self.vision_callback, 10)
         self.create_subscription(
             PersonArray, "/people_tracked", self.laser_callback, 10
         )
         self.people_fused_pub = self.create_publisher(
-            People, "/people_fused", 10
+            People, "/people", 10
         )
 
         self.dist_travelled = 0.0
@@ -166,14 +165,14 @@ class PersonFusion(Node):
         var_obs_local = std_obs_vision**2
         observation_covariance = var_obs_local * np.eye(2)
 
-        for pose in people.poses:
-            pos_x = pose.position.x
-            pos_y = pose.position.y
+        for pose in people.people:
+            pos_x = pose.pose.position.x
+            pos_y = pose.pose.position.y
             orientation = [
-                pose.orientation.x,
-                pose.orientation.y,
-                pose.orientation.z,
-                pose.orientation.w,
+                pose.pose.orientation.x,
+                pose.pose.orientation.y,
+                pose.pose.orientation.z,
+                pose.pose.orientation.w,
             ]
 
             # Check if this person already exists
