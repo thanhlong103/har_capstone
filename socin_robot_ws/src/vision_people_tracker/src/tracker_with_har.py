@@ -116,7 +116,7 @@ class VisionLegTracker(Node):
         self.get_logger().info("Vision Leg Tracker Node has started.")
 
         # Add a publisher for person coordinates
-        self.coord_publisher = self.create_publisher(People, "/people_vision_pos", 10)
+        self.coord_publisher = self.create_publisher(People, "/people_vision", 10)
         self.marker_publisher = self.create_publisher(MarkerArray, "/human_markers", 10)
 
         # Define the static transform broadcaster

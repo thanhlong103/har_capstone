@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# =========== LIDAR ==============
+(
+  cd /home/ntlong/har_capstone/lidar_leg_tracker_ws || exit
+  source install/setup.bash
+  ros2 launch ldlidar_stl_ros2 ld19.launch.py
+) &
+
+#========== ROBOT BRINGUP ============
+(
+  cd /home/ntlong/har_capstone/socin_robot_ws || exit
+  source install/setup.bash
+  ros2 launch turtlebot3_bringup robot.launch.py
+) &
+
+#========== FUSING DATA AND GROUP DETECTION ===========
+(
+  cd /home/ntlong/har_capstone/socin_robot_ws || exit
+  source install/setup.bash
+  ros2 run fusing_people fusing_people
+) &
+
+(
+  cd /home/ntlong/har_capstone/socin_robot_ws || exit
+  source install/setup.bash
+  ros2 run fusing_people fused_group
+) &
+
+#========== CAMERA & HAR & TRACKER ============
+(
+  cd /home/ntlong/har_capstone/socin_robot_ws/src/vision_people_tracker/src || exit
+  source tf/bin/activate
+  python3 tracker_with_har.py
+) &
+
+(
+  cd ~/har_capstone
+  python3 filter_lidar.py || exit
+) &
+
+# Launch Rviz2
+rviz2 -d ~/har_capstone/rviz2/fused.rviz &
+
+# Wait for all background processes to finish
+wait
