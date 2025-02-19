@@ -18,7 +18,7 @@ class OdomLogger(Node):
         )
 
         # Create CSV file
-        self.csv_filename = os.path.join(os.path.expanduser('~'), 'odom_log.csv')
+        self.csv_filename = os.path.join(os.path.expanduser('~/har_capstone/report/src/data_visualization/'), 'odom_log.csv')
         self.csv_file = open(self.csv_filename, 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['timestamp', 'x', 'y', 'theta'])

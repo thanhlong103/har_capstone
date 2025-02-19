@@ -7,7 +7,7 @@ import math
 import time
 import csv
 
-cap = cv2.VideoCapture("ground_truth.mp4")
+cap = cv2.VideoCapture("har_test_data/ground_truth.mp4")
 
 label = "Warmup...."
 n_time_steps = 10
@@ -181,8 +181,6 @@ with open(csv_filename, mode='w', newline='') as file:
 
                 y, x, _ = img.shape
 
-                print(y)
-
                 frame_points = [frame_idx]
 
                 if current_frame == frame_indices[frame_idx]:
@@ -219,7 +217,7 @@ with open(csv_filename, mode='w', newline='') as file:
                     fpsArr = []
                     sumfps = 0
 
-                cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
+                # cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA) 
 
                 cv2.imshow("Image", img)
 
