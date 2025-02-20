@@ -455,14 +455,14 @@ class VisionLegTracker(Node):
     def draw_class_on_image(self, label, img, bbox):
         y, x, _ = img.shape
         font = cv2.FONT_HERSHEY_SIMPLEX
-        position = (int(bbox[1] * x), int(bbox[0] * y - 10))
+        position = (int((bbox[3] + bbox[1]) / 2 * x), int((bbox[0] + bbox[2]) / 2 * y))
         fontScale = 1
         fontColor = (0, 255, 0)
         thickness = 2
         lineType = 2
         # print(position)
         cv2.putText(
-            img, label, (10, 30), font, fontScale, fontColor, thickness, lineType
+            img, label, position, font, fontScale, fontColor, thickness, lineType
         )
 
     def transform_keypoints(self, keypoints, original_frame, aligned_frame):
