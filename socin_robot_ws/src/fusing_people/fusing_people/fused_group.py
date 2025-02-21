@@ -26,7 +26,7 @@ class FusedPeopleSubscriber(Node):
         # Publisher for PeopleGroupArray
         self.publisher = self.create_publisher(PeopleGroupArray, "/people_groups", 10)
 
-        self.runtime_publisher = self.create_publisher(Float32, '/group_runtime', 10)
+        self.runtime_publisher = self.create_publisher(Float32, "/group_runtime", 10)
 
         # Apply DBSCAN clustering
         # eps is the maximum distance between two points to be considered as neighbors
@@ -91,23 +91,39 @@ class FusedPeopleSubscriber(Node):
 
         if len(intersection_points) == 1:
             distances = [
-                Point(pt[0], pt[1]).distance(intersection_points[0])
-                for pt in cluster
+                Point(pt[0], pt[1]).distance(intersection_points[0]) for pt in cluster
             ]
-            return np.mean(distances) < self.area_near_threshold, intersection_points[0], 0.0, distances[0]/2
+            return (
+                np.mean(distances) < self.area_near_threshold,
+                intersection_points[0],
+                0.0,
+                distances[0] / 2,
+            )
 
         elif len(intersection_points) > 1:
             coords = [(pt.x, pt.y) for pt in intersection_points]
+
+            # Ensure we have enough points to create a valid polygon
+            if len(coords) < 3:
+                return (
+                    False,
+                    None,
+                    None,
+                    None,
+                )  # Not enough points to form a valid group
+
             polygon = Polygon(coords).convex_hull
             area = polygon.area
 
             if area < self.interest_area:
                 centroid = polygon.centroid
-                distances = [
-                    Point(pt[0], pt[1]).distance(centroid)
-                    for pt in cluster
-                ]
-                return np.mean(distances) < self.area_near_threshold, centroid, area, distances[0]
+                distances = [Point(pt[0], pt[1]).distance(centroid) for pt in cluster]
+                return (
+                    np.mean(distances) < self.area_near_threshold,
+                    centroid,
+                    area,
+                    distances[0],
+                )
 
         return False, None, None, None
 
@@ -130,8 +146,15 @@ class FusedPeopleSubscriber(Node):
             self.get_logger().info("No people detected in the /people_fused topic.")
             return
 
-        self.pose_array = [self.pose_process(pose) for pose in msg.poses]
-        self.pose_array = np.array(self.pose_array)
+        if not msg.people:
+            self.get_logger().info("No people detected in the /people_vision topic.")
+            return
+
+        self.pose_array = np.array([self.pose_process(pose) for pose in msg.people])
+
+        if self.pose_array.size == 0:
+            self.get_logger().info("No valid pose data found.")
+            return
 
         if len(self.pose_array) == 0:
             self.get_logger().info("No people detected in the /people_fused topic.")
@@ -139,6 +162,10 @@ class FusedPeopleSubscriber(Node):
 
         # DBSCAN clustering
         labels = self.dbscan.fit_predict(self.pose_array)
+
+        if len(self.pose_array) < self.dbscan.min_samples:
+            self.get_logger().info("Not enough points for clustering.")
+            return
 
         groups = {}
         for label in set(labels):
@@ -152,32 +179,40 @@ class FusedPeopleSubscriber(Node):
         for group_id, cluster in groups.items():
             people_group = PeopleGroup()
 
+            group_indices = np.where(labels == group_id)[0]  # Define before using
+
             isGroup, interest_point, area, radius = self.detect_group(cluster)
 
             print(interest_point)
+            if interest_point is None:
+                continue  # Skip if no valid intersection point
 
             # Check if the group is valid
             if isGroup:
                 activities_list = []
-                for i in group_indices:
-                    person_act = msg.people[i].activity
-                    activities_list.append(person_act)
-                    if i != 0:
-                        if activities_list[i] != activities_list[i-1]:
-                            self.get_logger().info(f"Group {group_id} is not a valid group.")
-                            return
+                # for i in group_indices:
+                #     person_act = msg.people[i].activity
+                #     activities_list.append(person_act)
+                #     if i != 0 and activities_list[i] != activities_list[i - 1]:
+                #         self.get_logger().info(
+                #             f"Group {group_id} is not a valid group."
+                #         )
+                #         continue
 
-                people_group.centroid.x = interest_point.x
-                people_group.centroid.y = interest_point.y
-                people_group.area = area
-                people_group.radius = radius
+                if interest_point is not None:
+                    people_group.centroid.x = interest_point.x
+                    people_group.centroid.y = interest_point.y
+                    people_group.area = area
+                    people_group.radius = radius
+                else:
+                    continue  # Skip this group if no valid centroid
 
                 # Extract members of this group
                 group_indices = np.where(labels == group_id)[0]
 
                 # Populate the group with FusedPerson data
                 for idx in group_indices:
-                    person = msg.poses[idx]
+                    person = msg.people[idx].pose
                     fused_person = MyPerson()
                     # fused_person.id = person.id
                     fused_person.pose = person
@@ -185,9 +220,10 @@ class FusedPeopleSubscriber(Node):
                     people_group.people.append(fused_person)
 
                 if group_id == -1:
-                    group_id = 10
+                    continue  # Ignore noise points
+
                 # people_group.activity = activities_list[0]
-                people_group.id = int(group_id) 
+                people_group.id = int(group_id)
 
                 people_group_array.groups.append(people_group)
 
@@ -197,13 +233,14 @@ class FusedPeopleSubscriber(Node):
 
         runtime = Float32()
 
-        runtime.data = round(time.time() - start_time,3)
+        runtime.data = round(time.time() - start_time, 3)
 
         self.runtime_publisher.publish(runtime)
 
         # Publish the PeopleGroupArray message
         self.publisher.publish(people_group_array)
         self.get_logger().info("Published PeopleGroupArray message.")
+
 
 def main(args=None):
     rclpy.init(args=args)

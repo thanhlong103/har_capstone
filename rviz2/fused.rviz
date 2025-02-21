@@ -5,7 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /PoseArray1
+        - /MarkerArray1
       Splitter Ratio: 0.5
     Tree Height: 787
   - Class: rviz_common/Selection
@@ -42,31 +42,11 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
-    - Alpha: 1
-      Arrow Length: 0.30000001192092896
-      Axes Length: 0.30000001192092896
-      Axes Radius: 0.009999999776482582
-      Class: rviz_default_plugins/PoseArray
-      Color: 255; 25; 0
-      Enabled: true
-      Head Length: 0.25
-      Head Radius: 0.20000000298023224
-      Name: PoseArray
-      Shaft Length: 0.4000000059604645
-      Shaft Radius: 0.07999999821186066
-      Shape: Arrow (3D)
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /people_vision
-      Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        humans: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -89,9 +69,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 247
+      Max Intensity: 246
       Min Color: 0; 0; 0
-      Min Intensity: 213
+      Min Intensity: 96
       Name: LaserScan
       Position Transformer: XYZ
       Selectable: true
@@ -122,9 +102,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 247
+      Max Intensity: 246
       Min Color: 0; 0; 0
-      Min Intensity: 213
+      Min Intensity: 35
       Name: LaserScan
       Position Transformer: XYZ
       Selectable: true
@@ -144,7 +124,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        humans: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -163,12 +143,6 @@ Visualization Manager:
           Value: true
         base_link:
           Value: true
-        base_scan:
-          Value: true
-        camera_depth_frame:
-          Value: true
-        camera_depth_optical_frame:
-          Value: true
         camera_frame:
           Value: true
         camera_link:
@@ -183,33 +157,38 @@ Visualization Manager:
           Value: true
         imu_link:
           Value: true
+        laser_frame:
+          Value: true
+        map:
+          Value: true
+        odom:
+          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: false
       Tree:
-        base_footprint:
-          base_link:
-            base_laser:
-              {}
-            base_scan:
-              {}
-            camera_frame:
-              {}
-            camera_link:
-              camera_depth_frame:
-                camera_depth_optical_frame:
+        map:
+          {}
+        odom:
+          base_footprint:
+            base_link:
+              base_laser:
+                laser_frame:
                   {}
-              camera_rgb_frame:
-                camera_rgb_optical_frame:
-                  {}
-            caster_back_left_link:
-              {}
-            caster_back_right_link:
-              {}
-            imu_link:
-              {}
+              camera_frame:
+                {}
+              camera_link:
+                camera_rgb_frame:
+                  camera_rgb_optical_frame:
+                    {}
+              caster_back_left_link:
+                {}
+              caster_back_right_link:
+                {}
+              imu_link:
+                {}
       Update Interval: 0
       Value: true
   Enabled: true
@@ -255,7 +234,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 6.464409351348877
+      Distance: 9.082030296325684
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
