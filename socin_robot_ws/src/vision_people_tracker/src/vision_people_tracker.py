@@ -555,7 +555,7 @@ class VisionLegTracker(Node):
             self.fpsArr = []
             sumfps = 0
 
-        cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
+        # cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
 
         # Stack both images horizontally
         images = np.hstack((img, depth_visual))

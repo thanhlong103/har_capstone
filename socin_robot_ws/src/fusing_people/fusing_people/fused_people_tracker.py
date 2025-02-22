@@ -30,7 +30,7 @@ class PersonFusion(Node):
             PersonArray, "/people_tracked", self.laser_callback, 10
         )
         self.people_fused_pub = self.create_publisher(
-            People, "/people", 10
+            People, "/people_fused", 10
         )
 
         self.dist_travelled = 0.0
@@ -245,7 +245,7 @@ class PersonFusion(Node):
         """Publish fused people data"""
         fused_people_msg = People()
         fused_people_msg.header.stamp = self.get_clock().now().to_msg()
-        fused_people_msg.header.frame_id = "map"  # Adjust based on your frame of reference
+        fused_people_msg.header.frame_id = "base_link"  # Adjust based on your frame of reference
 
         for person_id, person in dict.items():
             fused_person = MyPerson()

@@ -24,7 +24,7 @@ class FusedPeopleSubscriber(Node):
         )
 
         # Publisher for PeopleGroupArray
-        self.publisher = self.create_publisher(PeopleGroupArray, "/people_groups", 10)
+        self.publisher = self.create_publisher(PeopleGroupArray, "/people_groups_detected", 10)
 
         self.runtime_publisher = self.create_publisher(Float32, "/group_runtime", 10)
 
@@ -174,7 +174,7 @@ class FusedPeopleSubscriber(Node):
 
         people_group_array = PeopleGroupArray()
         people_group_array.header = Header()
-        people_group_array.header.frame_id = "laser_frame"
+        people_group_array.header.frame_id = "map"
 
         for group_id, cluster in groups.items():
             people_group = PeopleGroup()
