@@ -138,8 +138,8 @@ controller_server_rclcpp_node:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 10.0
-      publish_frequency: 10.0
+      update_frequency: 30.0
+      publish_frequency: 30.0
       global_frame: odom
       robot_base_frame: base_link
       use_sim_time: False
@@ -210,8 +210,8 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0
-      publsih_frequency: 1.0
+      update_frequency: 15.0
+      publsih_frequency: 15.0
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
@@ -269,8 +269,6 @@ global_costmap:
         interaction_width_scale: 0.6
         centroid_amplitude: 200.0
         centroid_scale: 1.0
-        initial_activity_scale: 1.0
-        walking_phone_scale: 2.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True

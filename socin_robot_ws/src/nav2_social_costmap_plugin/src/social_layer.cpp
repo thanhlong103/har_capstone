@@ -71,8 +71,14 @@ void SocialLayer::onInitialize() {
   declareParameter("interaction_width_scale", rclcpp::ParameterValue(0.6));
   declareParameter("centroid_amplitude", rclcpp::ParameterValue(200.0));
   declareParameter("centroid_scale", rclcpp::ParameterValue(1.0));
+
   declareParameter("initial_activity_scale", rclcpp::ParameterValue(1.0));
   declareParameter("walking_phone_scale", rclcpp::ParameterValue(2.0));
+  declareParameter("sitting_scale", rclcpp::ParameterValue(0.8));
+  declareParameter("sitwork_scale", rclcpp::ParameterValue(1.0));
+  declareParameter("talking_scale", rclcpp::ParameterValue(1.2));
+  declareParameter("wavehi_scale", rclcpp::ParameterValue(1.3));
+  declareParameter("drilling_scale", rclcpp::ParameterValue(1.8));
   get_parameters();
 
   tolerance_vel_still_ = 0.1;
@@ -108,7 +114,8 @@ void SocialLayer::get_parameters() {
   node_shared_ptr->get_parameter(name_ + "." + "use_vel_factor", use_vel_factor_);
   node_shared_ptr->get_parameter(name_ + "." + "speed_factor_multiplier", speed_factor_);
   node_shared_ptr->get_parameter(name_ + "." + "publish_occgrid", publish_occgrid_);
-  // In get_parameters() add
+  
+  // Interaction parameters
   node_shared_ptr->get_parameter(name_ + "." + "interaction_width", interaction_width_);
   node_shared_ptr->get_parameter(name_ + "." + "interaction_cost", interaction_cost_);
   node_shared_ptr->get_parameter(name_ + "." + "interaction_amplitude", interaction_amplitude_);
@@ -117,7 +124,14 @@ void SocialLayer::get_parameters() {
   node_shared_ptr->get_parameter(name_ + "." + "centroid_amplitude", centroid_amplitude_);
   node_shared_ptr->get_parameter(name_ + "." + "centroid_scale", centroid_scale_);
   node_shared_ptr->get_parameter(name_ + "." + "initial_activity_scale", initial_activity_scale_);
+
+  // Activity-based scaling factors
   node_shared_ptr->get_parameter(name_ + "." + "walking_phone_scale", walking_phone_scale_);
+  node_shared_ptr->get_parameter(name_ + "." + "sitting_scale", sitting_scale_);
+  node_shared_ptr->get_parameter(name_ + "." + "sitwork_scale", sitwork_scale_);
+  node_shared_ptr->get_parameter(name_ + "." + "talking_scale", talking_scale_);
+  node_shared_ptr->get_parameter(name_ + "." + "wavehi_scale", wavehi_scale_);
+  node_shared_ptr->get_parameter(name_ + "." + "drilling_scale", drilling_scale_);
 }
 
 void SocialLayer::peopleCallback(
@@ -191,8 +205,23 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     people_msgs::msg::MyPerson person = *p_it;
 
     double scale = initial_activity_scale_;
-    if (person.activity == 3) {
+    if (person.activity == 2) {
       scale = walking_phone_scale_;  // Scale factor for phone users
+    }
+    else if (person.activity == 3){
+      scale = sitting_scale_;
+    }
+    else if (person.activity == 4){
+      scale = sitwork_scale_;
+    }
+    else if (person.activity == 1){
+      scale = talking_scale_;
+    }
+    else if (person.activity == 6){
+      scale = wavehi_scale_;
+    }
+    else if (person.activity == 7){
+      scale = drilling_scale_;
     }
 
     double mag = sqrt(pow(person.velocity.x, 2) + pow(person.velocity.y, 2));
@@ -244,9 +273,25 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     }
 
     double scale_group = initial_activity_scale_;
-    if (transformed_group.activity == 3) {
+    if (transformed_group.activity == 2) {
       scale_group = walking_phone_scale_;  // Scale factor for phone users
     }
+    else if (transformed_group.activity == 3){
+      scale_group = sitting_scale_;
+    }
+    else if (transformed_group.activity == 4){
+      scale_group = sitwork_scale_;
+    }
+    else if (transformed_group.activity == 1){
+      scale_group = talking_scale_;
+    }
+    else if (transformed_group.activity == 6){
+      scale_group = wavehi_scale_;
+    }
+    else if (transformed_group.activity == 7){
+      scale_group = drilling_scale_;
+    }
+    
 
     for (const auto& original_person : group.people) {
 
@@ -338,8 +383,23 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
     people_msgs::msg::MyPerson person = *p_it;
 
     double scale = initial_activity_scale_;
-    if (person.activity == 3) {
+    if (person.activity == 2) {
       scale = walking_phone_scale_;  // Scale factor for phone users
+    }
+    else if (person.activity == 3){
+      scale = sitting_scale_;
+    }
+    else if (person.activity == 4){
+      scale = sitwork_scale_;
+    }
+    else if (person.activity == 1){
+      scale = talking_scale_;
+    }
+    else if (person.activity == 6){
+      scale = wavehi_scale_;
+    }
+    else if (person.activity == 7){
+      scale = drilling_scale_;
     }
     
     double mag = sqrt(person.velocity.x * person.velocity.x +
@@ -474,8 +534,23 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
   // Process groups
   for (const auto& group : transformed_groups_) {
     double scale_group = initial_activity_scale_;
-    if (group.activity == 3) {
-      scale_group = walking_phone_scale_;  // Scale if either person is using phone
+    if (group.activity == 2) {
+      scale_group = walking_phone_scale_;  // Scale factor for phone users
+    }
+    else if (group.activity == 3){
+      scale_group = sitting_scale_;
+    }
+    else if (group.activity == 4){
+      scale_group = sitwork_scale_;
+    }
+    else if (group.activity == 1){
+      scale_group = talking_scale_;
+    }
+    else if (group.activity == 6){
+      scale_group = wavehi_scale_;
+    }
+    else if (group.activity == 7){
+      scale_group = drilling_scale_;
     }
     
     // Apply scaled parameters
@@ -540,7 +615,7 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
               }
             }
             // If the cell is near the line, apply Gaussian drop-off
-            else if (dist <= interaction_width_) {
+            else if (dist <= interaction_width_ * scale_group) {
               // Calculate Gaussian drop-off based on perpendicular distance
               double gaussian_value = interaction_amplitude_ * exp(-(dist * dist) / (2.0 * interaction_width_scale_ * interaction_width_scale_));
 
@@ -653,7 +728,7 @@ void SocialLayer::connectToCentroid(const geometry_msgs::msg::Point& person_pos,
       double dist = distanceToLineSegment(wx, wy, x1, y1, x2, y2);
       
       // Apply line cost with Gaussian falloff
-      if (dist <= interaction_width_) {
+      if (dist <= interaction_width_ * scale) {
         double gaussian_value = interaction_amplitude_ * 
           exp(-(dist*dist)/(2*interaction_width_scale_ * scale * interaction_width_scale_ * scale));
         

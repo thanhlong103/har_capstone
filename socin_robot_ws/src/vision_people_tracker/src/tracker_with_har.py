@@ -445,11 +445,16 @@ class VisionLegTracker(Node):
         elif results == 2:
             label = "Walking Phone"
         elif results == 3:
-            label = "JOGGING"
+            label = "Sitting"
         elif results == 4:
-            label = "RUNNING"
+            label = "Sit Work"
+        elif results == 5:
+            label = "Standing"
+        elif results == 6:
+            label = "Wave Hi"
         else:
-            label = "WALKING"
+            label = "Drilling"
+            
         return results, label
 
     def draw_class_on_image(self, label, img, bbox):

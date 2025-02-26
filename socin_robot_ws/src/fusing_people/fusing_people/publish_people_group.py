@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, Point, PoseArray
 from std_msgs.msg import Header
-from people_msgs.msg import Person, People
+from people_msgs.msg import MyPerson, People
 import math
 import random
 
@@ -44,7 +44,7 @@ class GroupPublisher(Node):
         
         people_array.people = []
         for i, (px, py) in enumerate(people_positions):
-            person = Person()
+            person = MyPerson()
             person.id = i + 1
             
             person.pose.position.x = px
@@ -63,8 +63,8 @@ class GroupPublisher(Node):
             pose.position.x = px
             pose.position.y = py
             pose.position.z = 0.0
-            pose.orientation.z = person.position.orientation.z
-            pose.orientation.w = person.position.orientation.w
+            pose.orientation.z = person.pose.orientation.z
+            pose.orientation.w = person.pose.orientation.w
             pose_array.poses.append(pose)
             
             people_array.people.append(person)

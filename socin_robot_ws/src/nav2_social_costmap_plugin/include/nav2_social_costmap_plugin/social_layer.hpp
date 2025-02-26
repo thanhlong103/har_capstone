@@ -39,6 +39,11 @@ protected:
   double centroid_scale_;
   double initial_activity_scale_;
   double walking_phone_scale_;
+  double sitting_scale_;
+  double sitwork_scale_;
+  double talking_scale_;
+  double wavehi_scale_;
+  double drilling_scale_;
   
 public:
   SocialLayer() { layered_costmap_ = NULL; }
