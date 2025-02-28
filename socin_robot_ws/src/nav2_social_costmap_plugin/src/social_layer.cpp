@@ -217,25 +217,25 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     if (person.activity == 2) {
       scale = walking_phone_scale_;  // Scale factor for phone users
     }
+    // else if (person.activity == 3){
+    //   scale = sitting_scale_;
+    // }
     else if (person.activity == 3){
-      scale = sitting_scale_;
-    }
-    else if (person.activity == 4){
       scale = sitwork_scale_;
     }
     else if (person.activity == 1){
       scale = talking_scale_;
     }
-    else if (person.activity == 6){
+    else if (person.activity == 4){
       scale = wavehi_scale_;
     }
-    else if (person.activity == 7){
+    else if (person.activity == 5){
       scale = drilling_scale_;
     }
 
     double mag;
 
-    if (person.activity == 4 || person.activity == 7) {
+    if (person.activity == 3 || person.activity == 5) {
       // Use orientation yaw for sitwork/drilling
       mag = 2.0;
     } else {
@@ -295,19 +295,19 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     if (transformed_group.activity == 2) {
       scale_group = walking_phone_scale_;  // Scale factor for phone users
     }
+    // else if (transformed_group.activity == 3){
+    //   scale_group = sitting_scale_;
+    // }
     else if (transformed_group.activity == 3){
-      scale_group = sitting_scale_;
-    }
-    else if (transformed_group.activity == 4){
       scale_group = sitwork_scale_;
     }
     else if (transformed_group.activity == 1){
       scale_group = talking_scale_;
     }
-    else if (transformed_group.activity == 6){
+    else if (transformed_group.activity == 4){
       scale_group = wavehi_scale_;
     }
-    else if (transformed_group.activity == 7){
+    else if (transformed_group.activity == 5){
       scale_group = drilling_scale_;
     }
     
@@ -405,26 +405,26 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
     if (person.activity == 2) {
       scale = walking_phone_scale_;  // Scale factor for phone users
     }
+    // else if (person.activity == 3){
+    //   scale = sitting_scale_;
+    // }
     else if (person.activity == 3){
-      scale = sitting_scale_;
-    }
-    else if (person.activity == 4){
       scale = sitwork_scale_;
     }
     else if (person.activity == 1){
       scale = talking_scale_;
     }
-    else if (person.activity == 6){
+    else if (person.activity == 4){
       scale = wavehi_scale_;
     }
-    else if (person.activity == 7){
+    else if (person.activity == 5){
       scale = drilling_scale_;
     }
     
     double mag;
     double angle;
 
-    if (person.activity == 4 || person.activity == 7) {
+    if (person.activity == 3 || person.activity == 5) {
       // Use orientation yaw for sitwork/drilling
       angle = getYawFromQuaternion(person.pose.orientation);
       mag = 3.0;
@@ -568,19 +568,19 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
     if (group.activity == 2) {
       scale_group = walking_phone_scale_;  // Scale factor for phone users
     }
+    // else if (group.activity == 3){
+    //   scale_group = sitting_scale_;
+    // }
     else if (group.activity == 3){
-      scale_group = sitting_scale_;
-    }
-    else if (group.activity == 4){
       scale_group = sitwork_scale_;
     }
     else if (group.activity == 1){
       scale_group = talking_scale_;
     }
-    else if (group.activity == 6){
+    else if (group.activity == 4){
       scale_group = wavehi_scale_;
     }
-    else if (group.activity == 7){
+    else if (group.activity == 5){
       scale_group = drilling_scale_;
     }
     
