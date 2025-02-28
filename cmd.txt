@@ -51,3 +51,23 @@ python3 ~/har_capstone/lidar_leg_tracker_ws/src/ros2_leg_detector/src/scripts/pu
 python3 ~/har_capstone/fused_people_ws/src/fusing_people/fusing_people/poseArrayPublisher.py 
 
 
+
+
+
+
+# ====================== EXPERIMENT ====================== #
+
+cd har_capstone/socin_robot_ws/bash
+./run.sh
+
+ros2 launch turtlebot3_bringup robot_launch.py
+
+convert.py
+
+navigation2
+
+metrics
+
+publish image
+
+receive image

@@ -15,6 +15,8 @@ from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 
 from people_msgs.msg import People, MyPerson
 
@@ -30,6 +32,9 @@ class VisionLegTracker(Node):
         self.device_product_line = str(
             self.device.get_info(rs.camera_info.product_line)
         )
+
+        self.image_publisher_ = self.create_publisher(Image, 'robot_vision', 10)
+        self.bridge = CvBridge()
 
         self.cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
         self.cfg.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
@@ -650,6 +655,8 @@ class VisionLegTracker(Node):
         images = np.hstack((img, depth_visual))
 
         cv2.imshow("People Detected", images)
+        img_msg = self.bridge.cv2_to_imgmsg(images, encoding='bgr8')
+        self.image_publisher_.publish(img_msg)
 
         if cv2.waitKey(1) == ord("q"):
             self.pipe.stop()
