@@ -441,7 +441,7 @@ class VisionLegTracker(Node):
         if results == 0:
             label = "Walking"
         elif results == 1:
-            label = "Talking"
+            label = "Discussing"
         elif results == 2:
             label = "Walking Phone"
         # elif results == 3:
