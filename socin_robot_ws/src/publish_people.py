@@ -1,7 +1,9 @@
 import rclpy
 from rclpy.node import Node
 from people_msgs.msg import People, MyPerson, PeopleGroupArray, PeopleGroup
-from geometry_msgs.msg import Point, Pose
+from geometry_msgs.msg import Point, Pose, Quaternion
+import tf_transformations
+import math
 from std_msgs.msg import Header
 import threading
 import sys
@@ -26,11 +28,16 @@ class PeoplePublisher(Node):
         # Create a timer to publish data periodically
         self.timer = self.create_timer(1.0, self.publish_people)
 
+        yaw = -0.78
+
+        quaternion = tf_transformations.quaternion_from_euler(0, 0, yaw)
+        
+
         self.static_people = [
             MyPerson(
                 pose=Pose(position=Point(x=2.8, y=8.0, z=0.0)),  # Corrected
                 velocity=Point(x=0.0, y=0.0, z=0.0),
-                activity = 0,
+                activity = 7,
             ),
             MyPerson(
                 pose=Pose(position=Point(x=6.0, y=10.2, z=0.0)),  # Corrected
@@ -38,9 +45,9 @@ class PeoplePublisher(Node):
                 activity = 0,
             ),
             MyPerson(
-                pose=Pose(position=Point(x=9.5, y=6.3, z=0.0)),  # Corrected
+                pose=Pose(position=Point(x=9.5, y=6.3, z=0.0), orientation=Quaternion(x=quaternion[0], y=quaternion[1], z=quaternion[2], w=quaternion[3])),  # Corrected
                 velocity=Point(x=0.0, y=0.0, z=0.0),
-                activity = 0,
+                activity = 7,
             ),
             MyPerson(
                 pose=Pose(position=Point(x=13.8, y=4.7, z=0.0)),  # Corrected

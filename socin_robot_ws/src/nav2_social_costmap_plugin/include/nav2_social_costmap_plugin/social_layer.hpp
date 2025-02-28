@@ -44,7 +44,7 @@ protected:
   double talking_scale_;
   double wavehi_scale_;
   double drilling_scale_;
-  
+
 public:
   SocialLayer() { layered_costmap_ = NULL; }
 
@@ -67,6 +67,7 @@ public:
   // Helper function
   double distanceToLineSegment(double x, double y, double x1, double y1, double x2, double y2);
   double distanceToMergedRegion(double wx, double wy, const std::vector<geometry_msgs::msg::Point>& hull);
+  double getYawFromQuaternion(const geometry_msgs::msg::Quaternion& quat);
   std::vector<std::vector<people_msgs::msg::MyPerson>> clusterPeople(const std::list<people_msgs::msg::MyPerson>& people,double max_group_distance);
   std::vector<geometry_msgs::msg::Point> computeConvexHull(const std::vector<people_msgs::msg::MyPerson>& group);
 

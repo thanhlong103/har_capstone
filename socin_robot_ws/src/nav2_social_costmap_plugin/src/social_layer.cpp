@@ -163,6 +163,7 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     people_msgs::msg::MyPerson &person = people_list_.people[i];
     people_msgs::msg::MyPerson tpt;
     geometry_msgs::msg::PointStamped pt, opt;
+    geometry_msgs::msg::QuaternionStamped quat_in, quat_out;
 
     pt.point.x = person.pose.position.x;
     pt.point.y = person.pose.position.y;
@@ -185,6 +186,14 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     tpt.pose.position.y = opt.point.y;
     tpt.pose.position.z = opt.point.z;
     tpt.activity = person.activity;
+
+    // Transform Orientation
+    quat_in.quaternion = person.pose.orientation;
+    quat_in.header.frame_id = people_list_.header.frame_id;
+    quat_in.header.stamp = people_list_.header.stamp;
+
+    tf_->transform(quat_in, quat_out, global_frame);
+    tpt.pose.orientation = quat_out.quaternion;
 
     pt.point.x += person.velocity.x;
     pt.point.y += person.velocity.y;
@@ -224,7 +233,17 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
       scale = drilling_scale_;
     }
 
-    double mag = sqrt(pow(person.velocity.x, 2) + pow(person.velocity.y, 2));
+    double mag;
+
+    if (person.activity == 4 || person.activity == 7) {
+      // Use orientation yaw for sitwork/drilling
+      mag = 2.0;
+    } else {
+      // Default to velocity direction for other activities
+      mag = sqrt(person.velocity.x * person.velocity.x +
+                      person.velocity.y * person.velocity.y);
+    }
+
     double greater = get_radius(cutoff_, amplitude_, sigma_when_still_ * scale);
     if (mag >= tolerance_vel_still_) {
       double front_height =
@@ -328,7 +347,7 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
       transformed_groups_.push_back(transformed_group);
 
       // Update bounds for centroid Gaussian
-      double centroid_padding = centroid_scale_ * 3.0 * scale_group;  // 3σ coverage
+      double centroid_padding = centroid_scale_ * 6.0 * scale_group;  // 3σ coverage
       *min_x = std::min(*min_x, transformed_group.centroid.x - centroid_padding);
       *min_y = std::min(*min_y, transformed_group.centroid.y - centroid_padding);
       *max_x = std::max(*max_x, transformed_group.centroid.x + centroid_padding);
@@ -339,7 +358,7 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
   // Calculate bounds for groups
   for (const auto& group : transformed_groups_) {
     for (const auto& person : group.people) {
-      double padding = interaction_width_ * 2.0;
+      double padding = interaction_width_ * 6.0;
       *min_x = std::min(*min_x, person.pose.position.x - padding);
       *min_y = std::min(*min_y, person.pose.position.y - padding);
       *max_x = std::max(*max_x, person.pose.position.x + padding);
@@ -402,9 +421,21 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
       scale = drilling_scale_;
     }
     
-    double mag = sqrt(person.velocity.x * person.velocity.x +
+    double mag;
+    double angle;
+
+    if (person.activity == 4 || person.activity == 7) {
+      // Use orientation yaw for sitwork/drilling
+      angle = getYawFromQuaternion(person.pose.orientation);
+      mag = 3.0;
+      RCLCPP_DEBUG(node_->get_logger(), "Activity %d: Orientation yaw = %.2f radians", person.activity, angle);
+    } else {
+      // Default to velocity direction for other activities
+      angle = atan2(person.velocity.y, person.velocity.x);
+      mag = sqrt(person.velocity.x * person.velocity.x +
                       person.velocity.y * person.velocity.y);
-    double angle = atan2(person.velocity.y, person.velocity.x);
+    }
+
     double angle_right = angle - 1.57; // 1.51;
     double radius = get_radius(cutoff_, amplitude_, sigma_when_still_ * scale);
     double front_height = radius;
@@ -767,6 +798,14 @@ double SocialLayer::distanceToLineSegment(double x, double y,
   double proj_y = y1 + t*dy;
 
   return sqrt((x - proj_x)*(x - proj_x) + (y - proj_y)*(y - proj_y));
+}
+
+double SocialLayer::getYawFromQuaternion(const geometry_msgs::msg::Quaternion& quat) {
+  tf2::Quaternion tf_quat;
+  tf2::fromMsg(quat, tf_quat);
+  double roll, pitch, yaw;
+  tf2::Matrix3x3(tf_quat).getRPY(roll, pitch, yaw);
+  return yaw;
 }
 
 } // namespace nav2_social_costmap_plugin
