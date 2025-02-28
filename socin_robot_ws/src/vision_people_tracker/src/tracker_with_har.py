@@ -103,7 +103,7 @@ class VisionLegTracker(Node):
         try:
             # Load quantized HAR model
             self.har_interpreter = tf.lite.Interpreter(
-                model_path="model_quantized_custom.tflite"
+                model_path="model_quantized.tflite"
             )
             self.har_interpreter.allocate_tensors()
             self.har_input_details = self.har_interpreter.get_input_details()
@@ -441,16 +441,16 @@ class VisionLegTracker(Node):
         if results == 0:
             label = "Walking"
         elif results == 1:
-            label = "Talking"
+            label = "Discussing"
         elif results == 2:
             label = "Walking Phone"
+        # elif results == 3:
+        #     label = "Sitting"
         elif results == 3:
-            label = "Sitting"
-        elif results == 4:
             label = "Sit Work"
-        elif results == 5:
-            label = "Standing"
-        elif results == 6:
+        # elif results == 5:
+        #     label = "Standing"
+        elif results == 4:
             label = "Wave Hi"
         else:
             label = "Drilling"
