@@ -10,7 +10,7 @@ class ImageSubscriber(Node):
         super().__init__('image_subscriber')
         self.subscription = self.create_subscription(
             Image,
-            'image_raw',
+            'robot_vision',
             self.image_callback,
             10)
         self.subscription  # Prevent unused variable warning

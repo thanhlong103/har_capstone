@@ -13,6 +13,7 @@ options = {
   use_odometry = true,  -- Ensure odometry is being published
   use_nav_sat = false,
   use_landmarks = false,
+  -- range_sensor_topic = "filtered_scan",
   num_laser_scans = 1,
   num_multi_echo_laser_scans = 0,
   num_subdivisions_per_laser_scan = 1,
