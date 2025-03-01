@@ -38,11 +38,6 @@ install(DIRECTORY launch model
 
 install(
   PROGRAMS
-  src/augment.py
-  src/HAR.py
-  src/moveNet.py
-  src/process.py
-  src/vision_people_tracker.py
   DESTINATION lib/${PROJECT_NAME}
 )
 ament_package()
