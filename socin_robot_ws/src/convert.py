@@ -100,7 +100,7 @@ class PeopleFusedConverter(Node):
                 z=vel_base_link[2]
             )
 
-
+            person.activity = fused_person.activity
             people_msg.people.append(person)
         
         self.publisher.publish(people_msg)

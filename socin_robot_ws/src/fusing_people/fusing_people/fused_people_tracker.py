@@ -79,7 +79,7 @@ class PersonFusion(Node):
         self.next_id = 0
         self.pose_threshold = 2.0
 
-    def add_person(self, dict, person_id, pos_x, pos_y, orientation):
+    def add_person(self, dict, person_id, pos_x, pos_y, orientation, activity):
         """Initialize a new person with a unique ID"""
         dict[person_id] = {
             "filtered_state_means": [pos_x, pos_y, 0.0, 0.0],
@@ -91,6 +91,7 @@ class PersonFusion(Node):
             "orientation_z": orientation[2],
             "orientation_w": orientation[3],
             "last_updated": time.time(),
+            "activity": activity
         }
 
     def find_matching_person(self, dict, pos_x, pos_y):
@@ -175,6 +176,7 @@ class PersonFusion(Node):
                 pose.pose.orientation.w,
             ]
 
+            print(pose.activity)
             # Check if this person already exists
             person_id = self.find_matching_person(self.vision_people, pos_x, pos_y)
 
@@ -182,7 +184,7 @@ class PersonFusion(Node):
                 # If not found, create a new person with a unique ID
                 person_id = f"vision_{self.next_id}"
                 self.next_id += 10
-                self.add_person(self.vision_people, person_id, pos_x, pos_y, orientation)
+                self.add_person(self.vision_people, person_id, pos_x, pos_y, orientation, pose.activity)
 
             # Update the person's position and timestamp
             self.vision_people[person_id].update({
@@ -193,6 +195,7 @@ class PersonFusion(Node):
                 "orientation_z": orientation[2],
                 "orientation_w": orientation[3],
                 "last_updated": time.time(),
+                "activity": pose.activity
             })
 
             # Store for reference
@@ -220,7 +223,7 @@ class PersonFusion(Node):
                     # If not found, create a new person with a unique ID
                     person_id = f"lidar_{self.next_id}"
                     self.next_id += 10
-                    self.add_person(self.lidar_people, person_id, pos_x, pos_y, [0.0, 0.0, 0.0, 0.0])
+                    self.add_person(self.lidar_people, person_id, pos_x, pos_y, [0.0, 0.0, 0.0, 0.0], 0)
 
                 # Update the person's position and timestamp
                 self.lidar_people[person_id].update({
@@ -247,6 +250,8 @@ class PersonFusion(Node):
         fused_people_msg.header.stamp = self.get_clock().now().to_msg()
         fused_people_msg.header.frame_id = "base_link"  # Adjust based on your frame of reference
 
+        id = 0
+
         for person_id, person in dict.items():
             fused_person = MyPerson()
             fused_person.pose.position.x = person["pos_x"]
@@ -259,11 +264,15 @@ class PersonFusion(Node):
             fused_person.velocity.x = person["vel_x"]
             fused_person.velocity.y = person["vel_y"]
             fused_person.velocity.z = 0.0
-            fused_person.id = 0
+            fused_person.activity = person["activity"]
+            fused_person.id = id
+
+            id += 1
 
             fused_people_msg.people.append(fused_person)
 
         print(fused_people_msg)
+        id = 0
 
         self.people_fused_pub.publish(fused_people_msg)
 

@@ -210,8 +210,8 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 15.0
-      publsih_frequency: 15.0
+      update_frequency: 20.0
+      publsih_frequency: 20.0
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
