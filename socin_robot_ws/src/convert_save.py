@@ -43,7 +43,7 @@ class PeopleFusedConverter(Node):
         self.stored_groups = {}
 
         # Create a timer to periodically publish the stored messages
-        self.create_timer(0.1, self.publish_latest_data)  # Publish at 10 Hz
+        self.create_timer(0.03, self.publish_latest_data)  # Publish at 10 Hz
 
         self.get_logger().info("PeopleFusedConverter started.")
 

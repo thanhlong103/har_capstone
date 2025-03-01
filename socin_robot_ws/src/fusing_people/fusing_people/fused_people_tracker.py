@@ -223,7 +223,16 @@ class PersonFusion(Node):
                     # If not found, create a new person with a unique ID
                     person_id = f"lidar_{self.next_id}"
                     self.next_id += 10
-                    self.add_person(self.lidar_people, person_id, pos_x, pos_y, [0.0, 0.0, 0.0, 0.0], 0)
+                    
+                    # Find closest matching vision person
+                    matched_vision_id = self.find_matching_person(self.vision_people, pos_x, pos_y)
+
+                    # Assign activity from vision person if a match is found, otherwise set to unknown (0)
+                    activity = self.vision_people[matched_vision_id]["activity"] if matched_vision_id else 0
+
+                    # Create new lidar person with activity from vision person
+                    self.add_person(self.lidar_people, person_id, pos_x, pos_y, [0.0, 0.0, 0.0, 0.0], activity)
+
 
                 # Update the person's position and timestamp
                 self.lidar_people[person_id].update({
