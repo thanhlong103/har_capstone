@@ -66,7 +66,7 @@ class PeopleFusedConverter(Node):
         self.latest_group_msg.groups = list(self.stored_groups.values())
 
     def transform_people(self, msg):
-        """Transforms and returns a People message in the target frame."""
+        """Transforms and returns a People message in the target frame, including orientation."""
         people_msg = People()
         people_msg.header.stamp = self.get_clock().now().to_msg()
         people_msg.header.frame_id = self.target_frame
@@ -98,35 +98,49 @@ class PeopleFusedConverter(Node):
 
         for fused_person in msg.people:
             person = MyPerson()
-            pos_map = np.array(
-                [
-                    fused_person.pose.position.x,
-                    fused_person.pose.position.y,
-                    fused_person.pose.position.z,
-                ]
-            )
-            vel_map = np.array(
-                [
-                    fused_person.velocity.x,
-                    fused_person.velocity.y,
-                    fused_person.velocity.z,
-                ]
-            )
-
-            # Transform position and velocity
+            
+            # Transform position
+            pos_map = np.array([
+                fused_person.pose.position.x,
+                fused_person.pose.position.y,
+                fused_person.pose.position.z,
+            ])
             pos_base_link = self.rotation_matrix @ pos_map + np.array(
                 [self.t_x, self.t_y, self.t_z]
             )
-            vel_base_link = self.rotation_matrix @ vel_map
-
             person.pose.position = Point(
                 x=pos_base_link[0], y=pos_base_link[1], z=pos_base_link[2]
             )
+
+            # Transform orientation (quaternion)
+            q_in = [
+                fused_person.pose.orientation.x,
+                fused_person.pose.orientation.y,
+                fused_person.pose.orientation.z,
+                fused_person.pose.orientation.w,
+            ]
+            q_rot = [q.x, q.y, q.z, q.w]
+
+            # Apply rotation
+            q_out = tf_transformations.quaternion_multiply(q_rot, q_in)
+
+            person.pose.orientation.x = q_out[0]
+            person.pose.orientation.y = q_out[1]
+            person.pose.orientation.z = q_out[2]
+            person.pose.orientation.w = q_out[3]
+
+            # Transform velocity
+            vel_map = np.array([
+                fused_person.velocity.x,
+                fused_person.velocity.y,
+                fused_person.velocity.z,
+            ])
+            vel_base_link = self.rotation_matrix @ vel_map
             person.velocity = Point(
                 x=vel_base_link[0], y=vel_base_link[1], z=vel_base_link[2]
             )
-            person.activity = fused_person.activity
 
+            person.activity = fused_person.activity
             people_msg.people.append(person)
 
         return people_msg
