@@ -455,8 +455,8 @@ class VisionLegTracker(Node):
             label = "Sit Work"
         # elif results == 5:
         #     label = "Standing"
-        elif results == 4:
-            label = "Wave Hi"
+        # elif results == 4:
+        #     label = "Wave Hi"
         else:
             label = "Drilling"
             
