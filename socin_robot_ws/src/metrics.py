@@ -26,8 +26,8 @@ class SocialCostCalculator(Node):
         # Subscribe to robot position, velocity, and human detections
         self.create_subscription(Odometry, '/odom', self.robot_pose_callback, 10)
         self.create_subscription(Twist, '/cmd_vel', self.robot_velocity_callback, 10)
-        self.create_subscription(People, '/people_metrics', self.human_detections_callback, 10)
-        self.create_subscription(PeopleGroupArray, '/people_groups_metrics', self.group_callback, 10)
+        self.create_subscription(People, '/people', self.human_detections_callback, 10)
+        self.create_subscription(PeopleGroupArray, '/people_groups', self.group_callback, 10)
 
         # Publisher for social cost metrics
         self.CI_pub = self.create_publisher(Float32, '/CI', 10)

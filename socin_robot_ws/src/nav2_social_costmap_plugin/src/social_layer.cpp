@@ -76,8 +76,8 @@ void SocialLayer::onInitialize() {
   declareParameter("walking_phone_scale", rclcpp::ParameterValue(2.0));
   declareParameter("sitting_scale", rclcpp::ParameterValue(0.8));
   declareParameter("sitwork_scale", rclcpp::ParameterValue(1.0));
-  declareParameter("talking_scale", rclcpp::ParameterValue(1.2));
-  declareParameter("wavehi_scale", rclcpp::ParameterValue(1.3));
+  declareParameter("talking_scale", rclcpp::ParameterValue(1.0));
+  declareParameter("wavehi_scale", rclcpp::ParameterValue(1.0));
   declareParameter("drilling_scale", rclcpp::ParameterValue(1.8));
   get_parameters();
 
@@ -226,16 +226,16 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     else if (person.activity == 1){
       scale = talking_scale_;
     }
+    // else if (person.activity == 4){
+    //   scale = wavehi_scale_;
+    // }
     else if (person.activity == 4){
-      scale = wavehi_scale_;
-    }
-    else if (person.activity == 5){
       scale = drilling_scale_;
     }
 
     double mag;
 
-    if (person.activity == 3 || person.activity == 5) {
+    if (person.activity == 3 || person.activity == 4) {
       // Use orientation yaw for sitwork/drilling
       mag = 2.0;
     } else {
@@ -304,10 +304,10 @@ void SocialLayer::updateBounds(double origin_x, double origin_y,
     else if (transformed_group.activity == 1){
       scale_group = talking_scale_;
     }
+    // else if (transformed_group.activity == 4){
+    //   scale_group = wavehi_scale_;
+    // }
     else if (transformed_group.activity == 4){
-      scale_group = wavehi_scale_;
-    }
-    else if (transformed_group.activity == 5){
       scale_group = drilling_scale_;
     }
     
@@ -414,20 +414,20 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
     else if (person.activity == 1){
       scale = talking_scale_;
     }
+    // else if (person.activity == 4){
+    //   scale = wavehi_scale_;
+    // }
     else if (person.activity == 4){
-      scale = wavehi_scale_;
-    }
-    else if (person.activity == 5){
       scale = drilling_scale_;
     }
     
     double mag;
     double angle;
 
-    if (person.activity == 3 || person.activity == 5) {
+    if (person.activity == 3 || person.activity == 4) {
       // Use orientation yaw for sitwork/drilling
       angle = getYawFromQuaternion(person.pose.orientation);
-      mag = 3.0;
+      mag = 2.0;
       RCLCPP_DEBUG(node_->get_logger(), "Activity %d: Orientation yaw = %.2f radians", person.activity, angle);
     } else {
       // Default to velocity direction for other activities
@@ -577,10 +577,10 @@ void SocialLayer::updateCosts(nav2_costmap_2d::Costmap2D &master_grid,
     else if (group.activity == 1){
       scale_group = talking_scale_;
     }
+    // else if (group.activity == 4){
+    //   scale_group = wavehi_scale_;
+    // }
     else if (group.activity == 4){
-      scale_group = wavehi_scale_;
-    }
-    else if (group.activity == 5){
       scale_group = drilling_scale_;
     }
     

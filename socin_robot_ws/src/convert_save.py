@@ -26,9 +26,9 @@ class PeopleFusedConverter(Node):
         )
 
         # Publishers
-        self.publisher = self.create_publisher(People, "/people", 10)
+        self.publisher = self.create_publisher(People, "/people_metrics", 10)
         self.group_publisher = self.create_publisher(
-            PeopleGroupArray, "/people_groups", 10
+            PeopleGroupArray, "/people_groups_metrics", 10
         )
 
         self.target_frame = "map"  # Convert to this frame
