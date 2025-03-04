@@ -649,14 +649,14 @@ class VisionLegTracker(Node):
             self.fpsArr = []
             sumfps = 0
 
-        cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
+        # cv2.putText(img, fps_str, (455, 30), font, 1, (100, 255, 0), 3, cv2.LINE_AA)
 
         # Stack both images horizontally
-        images = np.hstack((img, depth_visual))
+        # images = np.hstack((img, depth_visual))
 
-        cv2.imshow("People Detected", images)
-        img_msg = self.bridge.cv2_to_imgmsg(images, encoding='bgr8')
-        self.image_publisher_.publish(img_msg)
+        cv2.imshow("People Detected", img)
+        # img_msg = self.bridge.cv2_to_imgmsg(images, encoding='bgr8')
+        # self.image_publisher_.publish(img_msg)
 
         if cv2.waitKey(1) == ord("q"):
             self.pipe.stop()
