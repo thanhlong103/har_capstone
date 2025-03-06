@@ -63,7 +63,7 @@ class VisionLegTracker(Node):
         self.fpsArr = []
         self.sumfps = 0
 
-        self.confidence_threshold = 0.25
+        self.confidence_threshold = 0.2
         self.bbox_threshold = 0.125
 
         self.EDGES = {
@@ -437,45 +437,44 @@ class VisionLegTracker(Node):
 
         return keypoints_3d
 
-    def estimate_plane_pca(self, points, confidences=None):
+    def estimate_plane_pca(self, points, confidences=None, person_id=None):
         """
         Estimates a plane from a set of 3D points using PCA with confidence weighting, tailored for
-        keypoints from process_keypoints.
+        keypoints from process_keypoints, with robustness checks for degenerate cases.
 
         Parameters:
             points (numpy.ndarray): A (N, 3) array of 3D points [x, y, z], where N <= 17 (MoveNet keypoints).
                                     Invalid points may be [0, 0, 0].
-            confidences (numpy.ndarray, optional): A (N,) array ofconfidence scores for each point.
+            confidences (numpy.ndarray, optional): A (N,) array of confidence scores for each point.
                                                 If None, uses equal weighting for valid points.
+            person_id (int, optional): Unique ID of the person for accessing previous state.
 
         Returns:
-            normal_vector (numpy.ndarray): A (3,) vector representing the plane's normal.
+            normal_vector (numpy.ndarray): A (3,) vector representing the plane's normal, or fallback.
             centroid (numpy.ndarray): A (3,) vector representing the weighted centroid of valid points.
         """
         # Ensure points is a NumPy array with expected shape
         points = np.array(points, dtype=np.float32)
         if points.ndim != 2 or points.shape[1] != 3:
             self.get_logger().warning("Invalid points shape for PCA. Expected (N, 3). Returning defaults.")
-            return None, None
+            return self._get_fallback_normal(person_id), None
 
         # Filter out invalid points ([0, 0, 0]) from process_keypoints
         valid_mask = np.linalg.norm(points, axis=1) > 1e-6  # Non-zero norm indicates valid point
         if np.sum(valid_mask) < 3:
-            self.get_logger().warning("Fewer than 3 valid points for PCA. Returning defaults.")
-            return None, None
+            self.get_logger().warning("Fewer than 3 valid points for PCA. Using fallback.")
+            return self._get_fallback_normal(person_id), None
 
         valid_points = points[valid_mask]
 
         # Handle confidences
         if confidences is None:
-            # Default to equal weighting for valid points
             confidences = np.ones(valid_points.shape[0], dtype=np.float32)
         else:
-            confidences = np.array(confidences, dtype=np.float32)[valid_mask]  # Filter to valid points
+            confidences = np.array(confidences, dtype=np.float32)[valid_mask]
             if confidences.shape[0] != valid_points.shape[0]:
                 self.get_logger().warning("Confidence array size mismatch after filtering. Using equal weights.")
                 confidences = np.ones(valid_points.shape[0], dtype=np.float32)
-            # Clip confidences and ensure non-zero sum
             confidences = np.clip(confidences, 0.0, 1.0)
             if np.sum(confidences) < 1e-6:
                 self.get_logger().warning("Sum of confidences too low. Using equal weights.")
@@ -490,7 +489,7 @@ class VisionLegTracker(Node):
             centered_points = valid_points - centroid
 
             # Compute weighted covariance matrix
-            weighted_points = centered_points * confidences[:, np.newaxis]  # Shape: (N_valid, 3)
+            weighted_points = centered_points * confidences[:, np.newaxis]
             covariance_matrix = np.dot(weighted_points.T, centered_points) / weight_sum
 
             # Ensure symmetry and numerical stability
@@ -499,8 +498,22 @@ class VisionLegTracker(Node):
             # Perform eigen decomposition
             eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
 
+            # Robustness check: Eigenvalue ratios to detect degeneracy
+            eigenvalues = np.abs(eigenvalues)  # Ensure non-negative
+            sorted_idx = np.argsort(eigenvalues)  # Smallest to largest
+            lambda1, lambda2, lambda3 = eigenvalues[sorted_idx]  # Smallest, middle, largest
+
+            # Define thresholds for degeneracy
+            degeneracy_threshold = 1e-4  # Ratio below which points are nearly coplanar/collinear
+            if lambda3 < 1e-6:  # All eigenvalues tiny, data too noisy
+                self.get_logger().warning("All eigenvalues too small. Using fallback.")
+                return self._get_fallback_normal(person_id), centroid
+            elif lambda2 / lambda3 < degeneracy_threshold:  # Middle eigenvalue too small
+                self.get_logger().warning("Points nearly collinear/coplanar. Using fallback.")
+                return self._get_fallback_normal(person_id), centroid
+
             # Normal vector is eigenvector with smallest eigenvalue
-            min_eigen_idx = np.argmin(eigenvalues)
+            min_eigen_idx = sorted_idx[0]
             normal_vector = eigenvectors[:, min_eigen_idx]
 
             # Normalize the normal vector
@@ -508,17 +521,39 @@ class VisionLegTracker(Node):
             if norm > 1e-6:
                 normal_vector /= norm
             else:
-                self.get_logger().warning("Normal vector norm too small. Returning default.")
-                return None, centroid
+                self.get_logger().warning("Normal vector norm too small. Using fallback.")
+                return self._get_fallback_normal(person_id), centroid
 
         except np.linalg.LinAlgError:
-            self.get_logger().error("Eigen decomposition failed. Returning defaults.")
-            return None, None
+            self.get_logger().error("Eigen decomposition failed. Using fallback.")
+            return self._get_fallback_normal(person_id), centroid
         except Exception as e:
-            self.get_logger().error(f"Unexpected error in PCA: {e}. Returning defaults.")
-            return None, None
+            self.get_logger().error(f"Unexpected error in PCA: {e}. Using fallback.")
+            return self._get_fallback_normal(person_id), centroid
 
         return normal_vector, centroid
+
+    def _get_fallback_normal(self, person_id):
+        """
+        Helper function to retrieve a fallback normal vector based on person state.
+
+        Parameters:
+            person_id (int or None): Unique ID of the person for accessing previous state.
+
+        Returns:
+            numpy.ndarray: Fallback normal vector (previous or default).
+        """
+        if person_id is not None and person_id in self.people_states:
+            prev_theta = self.people_states[person_id].get('prev_theta')
+            if prev_theta is not None:
+                # Reconstruct normal from previous theta (approximation)
+                # Assuming normal lies in XZ plane (simplified)
+                normal = np.array([np.cos(prev_theta), 0.0, np.sin(prev_theta)], dtype=np.float32)
+                norm = np.linalg.norm(normal)
+                if norm > 1e-6:
+                    return normal / norm
+        # Default fallback if no previous data
+        return None
 
     def facing_direction(self, normal_vector, centroid, person_id):
         """
