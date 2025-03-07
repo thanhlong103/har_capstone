@@ -15,6 +15,7 @@ from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
+from geometry_msgs.msg import PoseArray, Pose
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
@@ -123,6 +124,7 @@ class VisionLegTracker(Node):
         # Add a publisher for person coordinates
         self.coord_publisher = self.create_publisher(People, "/people_vision", 10)
         self.marker_publisher = self.create_publisher(MarkerArray, "/human_markers", 10)
+        self.pose_array_publisher = self.create_publisher(PoseArray, "/ps_vision", 10)
 
         # Define the static transform broadcaster
         self.tf_broadcaster = StaticTransformBroadcaster(self)
@@ -320,7 +322,7 @@ class VisionLegTracker(Node):
                             )  # Access depth value
                             depth_list.append(current_depth)
 
-                        depth = np.min(depth_list)
+                        depth = np.median(depth_list)
                         coordinate_camera = rs.rs2_deproject_pixel_to_point(
                             intrinsics, [keypoints[i], keypoints[i + 1]], depth
                         )
@@ -361,6 +363,16 @@ class VisionLegTracker(Node):
             plane_point (numpy.ndarray): A (3,) vector representing a point on the plane (centroid).
         """
         # points = gaussian_filter(points, sigma=1)
+        
+        # # Convert points from list to NumPy array if it isn't already
+        # points = np.array(points, dtype=np.float32)
+        
+        # # Filter points with reasonable depth values (z-coordinate is points[:, 0] in your system)
+        # if points.size > 0:  # Check if points is not empty
+        #     points = points[(points[:, 0] > 0.2) & (points[:, 0] < 3.0)]
+        
+        # if len(points) < 3:  # Need at least 3 points for a plane
+        #     return None, None
 
         try:
             # Compute the centroid (mean) of the points
@@ -378,8 +390,8 @@ class VisionLegTracker(Node):
             # The normal vector to the plane is the eigenvector associated with the smallest eigenvalue
             normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
         except:
-            normal_vector = [0, 0, 0]
-            centroid = [0, 0, 0]
+            normal_vector = None
+            centroid = None
 
         return normal_vector, centroid
 
@@ -546,26 +558,13 @@ class VisionLegTracker(Node):
         # Localization to get the world coordinates
         person_world_coords = []
         poses = People()
-        marker_array = MarkerArray()
+        marker_array = MarkerArray() 
+        poses_array = PoseArray()
 
         for i in range(6):
             bbox = keypoints_with_scores[0][i][51:57]
             keypoints_draw = keypoints_with_scores[0][i][:51]
             kp_har_detect = kp_har[0][i][:51]
-
-            # if (keypoints_draw[17] > self.confidence_threshold):
-            right_shoulder = tuple(
-                [
-                    int(keypoints_draw[16] * self.WIDTH),
-                    int(keypoints_draw[15] * self.HEIGHT),
-                ]
-            )
-            left_shoulder = tuple(
-                [
-                    int(keypoints_draw[19] * self.WIDTH),
-                    int(keypoints_draw[18] * self.HEIGHT),
-                ]
-            )
 
             # Rendering
             self.draw(depth_visual, kp_har_detect, bbox)
@@ -574,8 +573,24 @@ class VisionLegTracker(Node):
             keypoints = self.process_keypoints(
                 self.intrinsics, keypoints_draw, depth_image, depth_frame
             )
-
+            
             # print(keypoints)
+            
+            # # if (keypoints_draw[17] > self.confidence_threshold):
+            # right_shoulder = tuple(
+            #     [
+            #         keypoints[16],
+            #         keypoints[15],
+            #     ]
+            # )
+            # left_shoulder = tuple(
+            #     [
+            #         keypoints[19],
+            #         keypoints[18],
+            #     ]
+            # )
+            
+            # print(right_shoulder, left_shoulder)
 
             if bbox[4] > self.bbox_threshold:
                 # print(left_shoulder, right_shoulder)
@@ -593,13 +608,16 @@ class VisionLegTracker(Node):
                     self.draw_class_on_image(self.label[i], img, bbox)
 
                 normal, centroid = self.estimate_plane_pca(keypoints)
+                
+                if normal is None:
+                    continue
 
                 theta = self.facing_direction(normal, centroid)
 
                 # print(theta)
 
-                if left_shoulder[0] - right_shoulder[0] > 20:
-                    theta = theta + 3.14
+                # if left_shoulder[0] - right_shoulder[0] > 20:
+                #     theta = theta + 3.14
 
                 x = float(centroid[0])
                 y = float(centroid[1])
@@ -621,6 +639,18 @@ class VisionLegTracker(Node):
 
                 # pose.orientation.z = theta
                 poses.people.append(pose)
+                
+                pose_array = Pose()
+                pose_array.position.x = x
+                pose_array.position.y = -y
+                pose_array.position.z = 0.03
+                q = quaternion_from_euler(0, 0, theta + 3.14)
+                pose_array.orientation.x = q[0]
+                pose_array.orientation.y = q[1]
+                pose_array.orientation.z = q[2]
+                pose_array.orientation.w = q[3]
+
+                poses_array.poses.append(pose_array)
 
                 marker_array = self.publish_human_marker(marker_array, i, x, y)
 
@@ -631,6 +661,9 @@ class VisionLegTracker(Node):
             self.coord_publisher.publish(poses)
             # Publish MarkerArray
             self.marker_publisher.publish(marker_array)
+            poses_array.header.frame_id = "camera_frame"
+            poses_array.header.stamp = self.get_clock().now().to_msg()
+            self.pose_array_publisher.publish(poses_array)
 
         # Display FPS
         font = cv2.FONT_HERSHEY_SIMPLEX

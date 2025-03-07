@@ -33,7 +33,7 @@
   source install/setup.bash
   cd /home/ntlong/har_capstone/socin_robot_ws/src/vision_people_tracker/src 
   source tf/bin/activate
-  python3 try_better_pca.py
+  python3 tracker_with_har.py
 ) &
 
 (
