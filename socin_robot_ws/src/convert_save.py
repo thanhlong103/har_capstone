@@ -192,7 +192,7 @@ class PeopleFusedConverter(Node):
 
             # Transform centroid
             centroid_map = np.array(
-                [group.centroid.x, group.centroid.y, group.centroid.z]
+                [detected_group.centroid.x, detected_group.centroid.y, detected_group.centroid.z]
             )
             centroid_base_link = self.rotation_matrix @ centroid_map + np.array(
                 [self.t_x, self.t_y, self.t_z]
