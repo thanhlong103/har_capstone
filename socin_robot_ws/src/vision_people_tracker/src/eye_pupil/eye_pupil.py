@@ -45,7 +45,7 @@ def track_pupil(image):
     return image
 
 # Main loop for capturing video
-cap = cv2.VideoCapture("480106035_9387289661338795_890617184540908566_n.mp4")  # Use the first webcam
+cap = cv2.VideoCapture("eye.mp4")  # Use the first webcam
 
 while True:
     ret, frame = cap.read()
@@ -57,7 +57,7 @@ while True:
 
     # Show the result in a window
     cv2.imshow('Pupil Tracker', output_frame)
-
+    
     # Press 'q' to exit
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break

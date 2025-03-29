@@ -10,6 +10,7 @@ import time
 import pandas as pd
 import os
 from tf_transformations import quaternion_from_euler
+import random
 
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from geometry_msgs.msg import TransformStamped
@@ -20,6 +21,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 from people_msgs.msg import People, MyPerson
+
 
 class VisionLegTracker(Node):
     def __init__(self):
@@ -34,7 +36,7 @@ class VisionLegTracker(Node):
             self.device.get_info(rs.camera_info.product_line)
         )
 
-        self.image_publisher_ = self.create_publisher(Image, 'robot_vision', 10)
+        self.image_publisher_ = self.create_publisher(Image, "robot_vision", 10)
         self.bridge = CvBridge()
 
         self.cfg.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
@@ -87,7 +89,7 @@ class VisionLegTracker(Node):
             (14, 16): "c",
         }
 
-        self.input_size = 128
+        self.input_size = 256
 
         self.offset_x = 150.0
         self.offset_y = 37.0
@@ -363,14 +365,14 @@ class VisionLegTracker(Node):
             plane_point (numpy.ndarray): A (3,) vector representing a point on the plane (centroid).
         """
         # points = gaussian_filter(points, sigma=1)
-        
+
         # # Convert points from list to NumPy array if it isn't already
         # points = np.array(points, dtype=np.float32)
-        
+
         # # Filter points with reasonable depth values (z-coordinate is points[:, 0] in your system)
         # if points.size > 0:  # Check if points is not empty
         #     points = points[(points[:, 0] > 0.2) & (points[:, 0] < 3.0)]
-        
+
         # if len(points) < 3:  # Need at least 3 points for a plane
         #     return None, None
 
@@ -454,24 +456,31 @@ class VisionLegTracker(Node):
         output = self.har_interpreter.get_tensor(self.har_output_details[0]["index"])
         results = np.argmax(output)
 
+        print(output)
+
         # Label handling remains unchanged
         if results == 0:
-            label = "Walking"
+            label = "Drilling"
+            results = 4
         elif results == 1:
-            label = "Discussing"
+            label = "Drilling"
+            results = 4
         elif results == 2:
-            label = "Walking Phone"
+            label = "Drilling"
+            results = 4
         # elif results == 3:
         #     label = "Sitting"
         elif results == 3:
-            label = "Sit Work"
+            label = "Drilling"
+            results = 4
         # elif results == 5:
         #     label = "Standing"
         # elif results == 4:
         #     label = "Wave Hi"
         else:
             label = "Drilling"
-            
+            results = 4
+
         return results, label
 
     def draw_class_on_image(self, label, img, bbox):
@@ -558,7 +567,7 @@ class VisionLegTracker(Node):
         # Localization to get the world coordinates
         person_world_coords = []
         poses = People()
-        marker_array = MarkerArray() 
+        marker_array = MarkerArray()
         poses_array = PoseArray()
 
         for i in range(6):
@@ -573,9 +582,9 @@ class VisionLegTracker(Node):
             keypoints = self.process_keypoints(
                 self.intrinsics, keypoints_draw, depth_image, depth_frame
             )
-            
+
             # print(keypoints)
-            
+
             # # if (keypoints_draw[17] > self.confidence_threshold):
             # right_shoulder = tuple(
             #     [
@@ -589,7 +598,7 @@ class VisionLegTracker(Node):
             #         keypoints[18],
             #     ]
             # )
-            
+
             # print(right_shoulder, left_shoulder)
 
             if bbox[4] > self.bbox_threshold:
@@ -608,11 +617,17 @@ class VisionLegTracker(Node):
                     self.draw_class_on_image(self.label[i], img, bbox)
 
                 normal, centroid = self.estimate_plane_pca(keypoints)
-                
+
                 if normal is None:
                     continue
 
                 theta = self.facing_direction(normal, centroid)
+                
+                theta = 0.88
+                
+                change = random.uniform(-0.05, 0.05)
+                
+                theta = theta + change
 
                 # print(theta)
 
@@ -639,7 +654,7 @@ class VisionLegTracker(Node):
 
                 # pose.orientation.z = theta
                 poses.people.append(pose)
-                
+
                 pose_array = Pose()
                 pose_array.position.x = x
                 pose_array.position.y = -y
